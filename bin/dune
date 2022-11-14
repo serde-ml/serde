@@ -1,0 +1,5 @@
+(executable
+ (public_name serde)
+ (package serde)
+ (name main)
+ (libraries serde))

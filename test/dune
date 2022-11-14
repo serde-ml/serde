@@ -1,0 +1,3 @@
+(test
+ (name manual_ser)
+ (libraries serde))
