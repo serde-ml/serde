@@ -20,15 +20,19 @@
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends ocaml dune)
- (tags
-  (topics "to describe" your project)))
+ )
 
 (package
  (name serde_derive)
  (synopsis "A short synopsis")
  (description "A longer description")
  (depends ocaml dune ppxlib serde)
- (tags
-  (topics "to describe" your project)))
+ )
 
+(package
+ (name serde_sexpr)
+ (synopsis "A short synopsis")
+ (description "A longer description")
+ (depends ocaml dune serde)
+ )
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

@@ -13,55 +13,87 @@ let var ~ctxt name =
 let rec ser_fun ~ctxt ~v (t : core_type) =
   let loc = loc ~ctxt in
   match t.ptyp_desc with
-
-  (** Serialize a constructor *)
-  | Ptyp_constr (name, _) ->
-      begin match name.txt |> Longident.name with
+  (* Serialize a constructor *)
+  | Ptyp_constr (name, _) -> (
+      match name.txt |> Longident.name with
       | "bool" -> [%expr Ser.serialize_bool [%e v]]
       | "char" -> [%expr Ser.serialize_char [%e v]]
       | "float" -> [%expr Ser.serialize_float [%e v]]
       | "int" -> [%expr Ser.serialize_int [%e v]]
       | "string" -> [%expr Ser.serialize_string [%e v]]
-      | "unit" -> [%expr Ser.serialize_unit ()]
-      | _ -> 
-        let ser_fn_name = match name.txt |> Longident.flatten_exn |> List.rev with
-          | name :: [] -> "serialize_" ^ name
-          | name :: path -> (("serialize_" ^ name) :: path) |> List.rev |> String.concat "."
-          | _ -> "unknown"
-        in
+      | "unit" -> [%expr Ser.serialize_unit [%e v]]
+      | _ ->
+          let ser_fn_name =
+            match name.txt |> Longident.flatten_exn |> List.rev with
+            | name :: [] -> "serialize_" ^ name
+            | name :: path ->
+                ("serialize_" ^ name) :: path |> List.rev |> String.concat "."
+            | _ -> "unknown"
+          in
 
-        let fn = ser_fn_name |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
+          let fn =
+            ser_fn_name |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc
+          in
 
-        Ast.pexp_apply ~loc fn [ (Nolabel, v) ]
-      end
-
-  (** Destructure a tuple and deserialize all of its fields *)
+          Ast.pexp_apply ~loc fn [ (Nolabel, v) ])
+  (* Destructure a tuple and deserialize all of its fields *)
   | Ptyp_tuple parts ->
       let pats =
         List.mapi
           (fun i part ->
             let f_idx = "f_" ^ Int.to_string i in
             let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
-            let exp = f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
-            pat, (exp, part) )
-         parts 
+            let exp =
+              f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc
+            in
+            (pat, (exp, part)))
+          parts
       in
 
-      let (destruct, exprs) = List.split pats in
+      let destruct, _exprs = List.split pats in
       let vb =
         let destruct = destruct |> Ast.ppat_tuple ~loc in
         [ Ast.value_binding ~loc ~pat:destruct ~expr:v ]
       in
 
-      let elements = List.map (fun (v, part) -> ser_fun ~ctxt ~v part) exprs in
+      let keys, exprs =
+        parts
+        |> List.mapi (fun idx ctyp ->
+               let f_idx = "f_" ^ Int.to_string idx in
+               let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
+               let var =
+                 f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc
+               in
+               let fn = ser_fun ~ctxt ctyp ~v:var in
+               (var, (pat, fn)))
+        |> List.split
+      in
 
-      Ast.pexp_let ~loc Nonrecursive vb 
-      [%expr
-        Ser.serialize_tuple
-          ~size:[%e List.length parts |> Ast.eint ~loc]
-          ~elements:[%e elements |> Ast.elist ~loc]]
+      let ser_call =
+        [%expr
+          Ser.serialize_tuple
+            ~size:[%e List.length parts |> Ast.eint ~loc]
+            ~elements]
+      in
 
-  (** Unsupported serialization for these *)
+      let field_list =
+        Ast.pexp_let ~loc Nonrecursive
+          [
+            Ast.value_binding ~loc
+              ~pat:[%pat? elements]
+              ~expr:(Ast.elist ~loc keys);
+          ]
+          ser_call
+      in
+
+      Ast.pexp_let ~loc Nonrecursive vb
+        (List.fold_left
+           (fun body (pat, exp) ->
+             let op = var ~ctxt "let*" in
+             let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
+             Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
+           field_list (List.rev exprs))
+  (* Unsupported serialization for these *)
   | Ptyp_any | Ptyp_var _
   | Ptyp_object (_, _)
   | Ptyp_class (_, _)
@@ -214,6 +246,18 @@ let gen_serialize_variant_impl ~ctxt typename constructors =
 let gen_serialize_record_impl ~ctxt typename fields =
   let loc = Expansion_context.Deriver.derived_item_loc ctxt in
 
+  let extract_fields =
+    let fields =
+      List.mapi
+        (fun i field ->
+          let f_idx = "f_" ^ Int.to_string i in
+          let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
+          (field.pld_name.txt |> Longident.parse |> Loc.make ~loc, pat))
+        fields
+    in
+    Ast.ppat_record ~loc fields Closed
+  in
+
   let keys, exprs =
     fields |> List.mapi (gen_record_field_impl ~ctxt) |> List.split
   in
@@ -232,12 +276,18 @@ let gen_serialize_record_impl ~ctxt typename fields =
       ser_call
   in
 
-  List.fold_left
-    (fun body (pat, exp) ->
-      let op = var ~ctxt "let*" in
-      let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
-      Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
-    field_list (List.rev exprs)
+  let body =
+    List.fold_left
+      (fun body (pat, exp) ->
+        let op = var ~ctxt "let*" in
+        let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
+        Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
+      field_list (List.rev exprs)
+  in
+
+  let t = "t" |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
+  let vb = [ Ast.value_binding ~loc ~pat:extract_fields ~expr:t ] in
+  Ast.pexp_let ~loc Nonrecursive vb body
 
 let gen_serialize_abstract_impl ~ctxt _typename core_type =
   let loc = loc ~ctxt in
@@ -255,21 +305,26 @@ let gen_serialize_impl ~ctxt type_decl =
         gen_serialize_variant_impl ~ctxt ptype_name constructors
     | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
         gen_serialize_record_impl ~ctxt ptype_name label_declarations
-    | {ptype_kind = Ptype_abstract; ptype_name; ptype_manifest; _ } ->
+    | { ptype_kind = Ptype_abstract; ptype_name; ptype_manifest; _ } ->
         gen_serialize_abstract_impl ~ctxt ptype_name ptype_manifest
-    | {ptype_kind ; ptype_name; _} ->
-        let err = (match ptype_kind with
-| Ptype_abstract -> "unsupported abstract type"
-| Ptype_variant _ -> "unsupported variant type"
-| Ptype_record _ -> "unsupported record type"
-| Ptype_open -> "unsupported open type") in
-        [%expr [%e ptype_name.txt |> Ast.estring ~loc ]
-          [%e err |>  Ast.estring ~loc ]]
+    | { ptype_kind; ptype_name; _ } ->
+        let err =
+          match ptype_kind with
+          | Ptype_abstract -> "unsupported abstract type"
+          | Ptype_variant _ -> "unsupported variant type"
+          | Ptype_record _ -> "unsupported record type"
+          | Ptype_open -> "unsupported open type"
+        in
+        [%expr
+          [%e ptype_name.txt |> Ast.estring ~loc] [%e err |> Ast.estring ~loc]]
   in
-  let serializer_name = ("serialize_" ^ typename) |> var ~ctxt |> Ast.ppat_var ~loc in
+  let serializer_name =
+    "serialize_" ^ typename |> var ~ctxt |> Ast.ppat_var ~loc
+  in
   [%stri
     (** Serialize a value of this type into Serde.data *)
-    let [%p serializer_name] = fun t ->
+    let [%p serializer_name] =
+     fun t ->
       let ( let* ) = Result.bind in
       (* NOTE(@ostera): horrible hack to avoid the unused warnings *)
       let* () = Ok () in

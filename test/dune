@@ -3,9 +3,9 @@
  (modules manual_ser)
  (libraries serde))
 
-(test
+(executable
  (name test_derive)
  (modules test_derive)
  (preprocess
   (pps serde_derive))
- (libraries serde serde_derive))
+ (libraries serde serde_derive serde_sexpr))

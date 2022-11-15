@@ -4,9 +4,7 @@ type t =
   | Float of float
   | String of string
   | Char of char
-  | Option of t option
   | Tuple of { tup_size : int; tup_elements : t list }
-  | Seq of { seq_size : int; seq_elements : t list }
   | Unit
   | Variant_unit of { vu_type : string; vu_name : string; vu_idx : int }
   | Variant_tuple of {
@@ -23,7 +21,6 @@ type t =
       vr_size : int;
       vr_fields : (string * t) list;
     }
-  | Map of { map_entries : (string * t) list }
   | Record of {
       rec_type : string;
       rec_size : int;
