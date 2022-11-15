@@ -25,11 +25,14 @@ let _ =
     serialize_variant (Salute { name = "sisko"; role = "captain" });
     serialize_variant (Nested_tuples (("oops", 1), true, (), 2112, true));
     serialize_r
-      { my_field = Salute { name = "sisko"; role = "captain" }; hello = "world" };
+      {
+        my_field = Salute { name = "sisko"; role = "captain" };
+        hello = "world";
+      };
   ]
   |> List.map (fun d ->
          let* value = d in
-         let* sexpr = Serde_sexpr.to_string value in
+         let* sexpr = Serde_sexpr.to_string_pretty value in
          print_newline ();
          print_string sexpr;
          print_newline ();
