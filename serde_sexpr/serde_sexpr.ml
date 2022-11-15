@@ -3,7 +3,7 @@ module S = Sexplib.Sexp
 
 let ( let* ) = Result.bind
 
-module Ser : Ser.Intf with type output = S.t = Ser.Make (struct
+module Serializer : Ser.Intf with type output = S.t = Ser.Make (struct
   type output = S.t
   type error = unit
 
@@ -60,6 +60,10 @@ module Ser : Ser.Intf with type output = S.t = Ser.Make (struct
     Ok (S.List [ S.Atom type_name; S.List fields ])
 end)
 
+module Deserializer : De.Intf = struct
+  include De.Unimplemented
+end
+
 let to_string_pretty t =
-  let* sexp = Serde.serialize (module Ser) t in
+  let* sexp = Serde.serialize (module Serializer) t in
   Ok (Sexplib.Sexp.to_string_hum sexp)

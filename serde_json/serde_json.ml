@@ -10,7 +10,7 @@ module Json = struct
     | Object of (string * t) list
     | Array of t list
 
-  let rec to_yojson t: Yojson.Safe.t =
+  let rec to_yojson t : Yojson.Safe.t =
     match t with
     | Null -> `Null
     | Bool b -> `Bool b
@@ -59,14 +59,13 @@ module Ser : Ser.Intf with type output = Json.t = Ser.Make (struct
       _output ~type_name ~variant_index:_ ~variant_name ~variant_size:_ ~fields
       =
     let* fields = Ser.map_field fields in
-    Ok (Json.Object [ (type_name ^ "#" ^ variant_name), Json.Object fields ])
+    Ok (Json.Object [ (type_name ^ "#" ^ variant_name, Json.Object fields) ])
 
   and serialize_record
       (module Ser : Ser.Mapper with type output = output and type error = error)
       _output ~type_name:_ ~record_size:_ ~fields =
     let* fields = Ser.map_field fields in
     Ok (Json.Object fields)
-
 end)
 
 let to_string_pretty t =
