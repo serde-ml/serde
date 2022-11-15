@@ -1,3 +1,4 @@
+(*
 open Serde
 
 module Test_int = struct
@@ -45,3 +46,4 @@ module Test_record = struct
     let fields = [ ("name", f0); ("kind", f1) ] in
     Ser.serialize_record ~typename:__serde__typename ~size:2 ~fields
 end
+*)

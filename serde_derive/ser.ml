@@ -2,9 +2,33 @@ open Ppxlib
 
 (** implementation *)
 
-let gen_serialize_variant_ctr_impl ~ctxt ctr =
+let gen_tuple_field_impl ~ctxt (i, part) =
   let loc = Expansion_context.Deriver.derived_item_loc ctxt in
-  
+  let fn = ser_fun ~ctxt part in
+  let f_idx = ("f_" ^ (Int.to_string i)) in
+  let pat = Ast_builder.ppat_var ~loc f_idx in
+  let var = Ast_builder.pexp_var ~loc f_idx in
+  let let_item = Ast_builder
+  var, [%stri let [%p pat] = [%e fn] [%e var]]
+
+let gen_serialize_tuple_variant_impl ~ctxt parts =
+  let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+
+  let (keys, exprs) =
+    parts
+    |> List.mapi (gen_tuple_field_impl ~ctxt)
+    |> List.split in
+
+  [%stri
+    [%i exprs ]
+    let fields = [%e keys ] in
+    Ser.serialize_tuple_variant ~typename:__serde__typename ~variant_idx:1
+      ~variant_name:"World" ~variant_size:1 ~fields]
+
+let gen_serialize_variant_ctr_impl ~ctxt ctr =
+  match ctr.pcd_args with
+  | Pcstr_tuple parts -> gen_serialize_tuple_variant_impl ~ctxt parts
+  | Pcstr_record fields -> gen_serialize_record_variant_impl ~ctxt fields
 
 let gen_serialize_variant_impl ~ctxt constructors =
   let loc = Expansion_context.Deriver.derived_item_loc ctxt in
