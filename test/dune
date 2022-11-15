@@ -3,9 +3,21 @@
  (modules manual_ser)
  (libraries serde))
 
+(test
+ (name manual_de)
+ (modules manual_de)
+ (libraries serde))
+
 (executable
  (name test_derive)
  (modules test_derive)
+ (preprocess
+  (pps serde_derive))
+ (libraries serde serde_derive serde_sexpr serde_json serde_xml))
+
+(executable
+ (name demo)
+ (modules demo)
  (preprocess
   (pps serde_derive))
  (libraries serde serde_derive serde_sexpr serde_json serde_xml))
