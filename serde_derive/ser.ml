@@ -110,7 +110,7 @@ let gen_serialize_record_variant_impl ~ctxt ~typename ~variant_name ~idx fields
       let op = var ~ctxt "let*" in
       let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
       Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
-    field_list exprs
+    field_list (List.rev exprs)
 
 let gen_tuple_field_impl ~ctxt i ctyp =
   let loc = loc ~ctxt in
@@ -148,7 +148,7 @@ let gen_serialize_tuple_variant_impl ~ctxt ~typename ~variant_name ~idx parts =
       let op = var ~ctxt "let*" in
       let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
       Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
-    field_list exprs
+    field_list (List.rev exprs)
 
 let gen_serialize_unit_variant_impl ~ctxt ~typename ~variant_name ~idx =
   let loc = loc ~ctxt in
@@ -211,31 +211,68 @@ let gen_serialize_variant_impl ~ctxt typename constructors =
   in
   Ast.pexp_match ~loc [%expr t] cases
 
-let gen_serialize_abstract_impl ~ctxt _typename core_type =
+let gen_serialize_record_impl ~ctxt typename fields =
   let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+
+  let keys, exprs =
+    fields |> List.mapi (gen_record_field_impl ~ctxt) |> List.split
+  in
+
+  let ser_call =
+    [%expr
+      Ser.serialize_record
+        ~typename:[%e typename.txt |> Ast.estring ~loc]
+        ~size:[%e List.length keys |> Ast.eint ~loc]
+        ~fields]
+  in
+
+  let field_list =
+    Ast.pexp_let ~loc Nonrecursive
+      [ Ast.value_binding ~loc ~pat:[%pat? fields] ~expr:(Ast.elist ~loc keys) ]
+      ser_call
+  in
+
+  List.fold_left
+    (fun body (pat, exp) ->
+      let op = var ~ctxt "let*" in
+      let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
+      Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
+    field_list (List.rev exprs)
+
+let gen_serialize_abstract_impl ~ctxt _typename core_type =
+  let loc = loc ~ctxt in
   let v = "t" |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
   ser_fun ~ctxt ~v (Option.get core_type)
 
 let gen_serialize_impl ~ctxt type_decl =
-  let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+  let loc = loc ~ctxt in
+
+  let typename = type_decl.ptype_name.txt in
+
   let body =
     match type_decl with
     | { ptype_kind = Ptype_variant constructors; ptype_name; _ } ->
         gen_serialize_variant_impl ~ctxt ptype_name constructors
+    | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
+        gen_serialize_record_impl ~ctxt ptype_name label_declarations
     | {ptype_kind = Ptype_abstract; ptype_name; ptype_manifest; _ } ->
         gen_serialize_abstract_impl ~ctxt ptype_name ptype_manifest
     | {ptype_kind ; ptype_name; _} ->
+        let err = (match ptype_kind with
+| Ptype_abstract -> "unsupported abstract type"
+| Ptype_variant _ -> "unsupported variant type"
+| Ptype_record _ -> "unsupported record type"
+| Ptype_open -> "unsupported open type") in
         [%expr [%e ptype_name.txt |> Ast.estring ~loc ]
-          [%e (match ptype_kind with
-| Ptype_abstract -> "abstract"
-| Ptype_variant _ -> "variant"
-| Ptype_record _ -> "record"
-| Ptype_open -> "open") |>  Ast.estring ~loc ]]
+          [%e err |>  Ast.estring ~loc ]]
   in
+  let serializer_name = ("serialize_" ^ typename) |> var ~ctxt |> Ast.ppat_var ~loc in
   [%stri
-    (** Serialize a value of type `t` into Serde.data *)
-    let serialize t =
+    (** Serialize a value of this type into Serde.data *)
+    let [%p serializer_name] = fun t ->
       let ( let* ) = Result.bind in
+      (* NOTE(@ostera): horrible hack to avoid the unused warnings *)
+      let* () = Ok () in
       [%e body]]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
