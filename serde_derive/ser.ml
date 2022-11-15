@@ -10,17 +10,115 @@ let var ~ctxt name =
 
 (** implementation *)
 
-let ser_fun ~ctxt (_v : core_type) =
+let rec ser_fun ~ctxt ~v (t : core_type) =
   let loc = loc ~ctxt in
-  [%expr ()]
+  match t.ptyp_desc with
 
-let gen_tuple_field_impl ~ctxt i ctyp =
+  (** Serialize a constructor *)
+  | Ptyp_constr (name, _) ->
+      begin match name.txt |> Longident.name with
+      | "bool" -> [%expr Ser.serialize_bool [%e v]]
+      | "char" -> [%expr Ser.serialize_char [%e v]]
+      | "float" -> [%expr Ser.serialize_float [%e v]]
+      | "int" -> [%expr Ser.serialize_int [%e v]]
+      | "string" -> [%expr Ser.serialize_string [%e v]]
+      | "unit" -> [%expr Ser.serialize_unit ()]
+      | _ -> 
+        let ser_fn_name = match name.txt |> Longident.flatten_exn |> List.rev with
+          | name :: [] -> "serialize_" ^ name
+          | name :: path -> (("serialize_" ^ name) :: path) |> List.rev |> String.concat "."
+          | _ -> "unknown"
+        in
+
+        let fn = ser_fn_name |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
+
+        Ast.pexp_apply ~loc fn [ (Nolabel, v) ]
+      end
+
+  (** Destructure a tuple and deserialize all of its fields *)
+  | Ptyp_tuple parts ->
+      let pats =
+        List.mapi
+          (fun i part ->
+            let f_idx = "f_" ^ Int.to_string i in
+            let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
+            let exp = f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
+            pat, (exp, part) )
+         parts 
+      in
+
+      let (destruct, exprs) = List.split pats in
+      let vb =
+        let destruct = destruct |> Ast.ppat_tuple ~loc in
+        [ Ast.value_binding ~loc ~pat:destruct ~expr:v ]
+      in
+
+      let elements = List.map (fun (v, part) -> ser_fun ~ctxt ~v part) exprs in
+
+      Ast.pexp_let ~loc Nonrecursive vb 
+      [%expr
+        Ser.serialize_tuple
+          ~size:[%e List.length parts |> Ast.eint ~loc]
+          ~elements:[%e elements |> Ast.elist ~loc]]
+
+  (** Unsupported serialization for these *)
+  | Ptyp_any | Ptyp_var _
+  | Ptyp_object (_, _)
+  | Ptyp_class (_, _)
+  | Ptyp_alias (_, _)
+  | Ptyp_variant (_, _, _)
+  | Ptyp_poly (_, _)
+  | Ptyp_package _ | Ptyp_extension _
+  | Ptyp_arrow (_, _, _) ->
+      [%expr ()]
+
+let gen_record_field_impl ~ctxt i ldecl =
   let loc = loc ~ctxt in
-  let fn = ser_fun ~ctxt ctyp in
   let f_idx = "f_" ^ Int.to_string i in
   let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
   let var = f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
-  (var, (pat, [%expr [%e fn] [%e var]]))
+  let fn = ser_fun ~ctxt ldecl.pld_type ~v:var in
+  let kv = [%expr [%e ldecl.pld_name.txt |> Ast.estring ~loc], [%e var]] in
+  (kv, (pat, fn))
+
+let gen_serialize_record_variant_impl ~ctxt ~typename ~variant_name ~idx fields
+    =
+  let loc = loc ~ctxt in
+
+  let keys, exprs =
+    fields |> List.mapi (gen_record_field_impl ~ctxt) |> List.split
+  in
+
+  let ser_call =
+    [%expr
+      Ser.serialize_record_variant
+        ~typename:[%e typename.txt |> Ast.estring ~loc]
+        ~variant_idx:[%e idx + 1 |> Ast.eint ~loc]
+        ~variant_name:[%e variant_name.txt |> Ast.estring ~loc]
+        ~variant_size:[%e List.length keys |> Ast.eint ~loc]
+        ~fields]
+  in
+
+  let field_list =
+    Ast.pexp_let ~loc Nonrecursive
+      [ Ast.value_binding ~loc ~pat:[%pat? fields] ~expr:(Ast.elist ~loc keys) ]
+      ser_call
+  in
+
+  List.fold_left
+    (fun body (pat, exp) ->
+      let op = var ~ctxt "let*" in
+      let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
+      Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
+    field_list exprs
+
+let gen_tuple_field_impl ~ctxt i ctyp =
+  let loc = loc ~ctxt in
+  let f_idx = "f_" ^ Int.to_string i in
+  let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
+  let var = f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
+  let fn = ser_fun ~ctxt ctyp ~v:var in
+  (var, (pat, fn))
 
 let gen_serialize_tuple_variant_impl ~ctxt ~typename ~variant_name ~idx parts =
   let loc = loc ~ctxt in
@@ -41,43 +139,71 @@ let gen_serialize_tuple_variant_impl ~ctxt ~typename ~variant_name ~idx parts =
 
   let field_list =
     Ast.pexp_let ~loc Nonrecursive
-      [
-        Ast.value_binding ~loc
-          ~pat:[%pat? fields]
-          ~expr:(Ast.esequence ~loc keys);
-      ]
+      [ Ast.value_binding ~loc ~pat:[%pat? fields] ~expr:(Ast.elist ~loc keys) ]
       ser_call
   in
 
-  Ast.letop
-    ~let_:
-      (Ast.binding_op ~loc ~op:(var ~ctxt "let*")
-         ~pat:[%pat? ( let* )]
-         ~exp:[%expr Result.bind])
-    ~ands:
-      (List.map
-         (fun (pat, exp) ->
-           Ast.binding_op ~loc ~pat ~exp ~op:(var ~ctxt "let*"))
-         exprs)
-    ~body:field_list
-  |> Ast.pexp_letop ~loc
+  List.fold_left
+    (fun body (pat, exp) ->
+      let op = var ~ctxt "let*" in
+      let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
+      Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
+    field_list exprs
+
+let gen_serialize_unit_variant_impl ~ctxt ~typename ~variant_name ~idx =
+  let loc = loc ~ctxt in
+
+  [%expr
+    Ser.serialize_unit_variant
+      ~typename:[%e typename.txt |> Ast.estring ~loc]
+      ~variant_idx:[%e idx + 1 |> Ast.eint ~loc]
+      ~variant_name:[%e variant_name.txt |> Ast.estring ~loc]]
 
 let gen_serialize_variant_ctr_impl ~ctxt ~typename idx ctr =
   let variant_name = ctr.pcd_name in
   match ctr.pcd_args with
+  | Pcstr_tuple [] ->
+      gen_serialize_unit_variant_impl ~ctxt ~typename ~variant_name ~idx
   | Pcstr_tuple parts ->
       gen_serialize_tuple_variant_impl ~ctxt ~typename ~variant_name ~idx parts
-  | _ -> exit 0
+  | Pcstr_record fields ->
+      gen_serialize_record_variant_impl ~ctxt ~typename ~variant_name ~idx
+        fields
 
 let gen_serialize_variant_impl ~ctxt typename constructors =
   let loc = Expansion_context.Deriver.derived_item_loc ctxt in
   let cases =
     List.mapi
       (fun idx ctr ->
+        let args =
+          match ctr.pcd_args with
+          | Pcstr_tuple [] -> None
+          | Pcstr_tuple fields ->
+              let fields =
+                List.mapi
+                  (fun i _ ->
+                    let f_idx = "f_" ^ Int.to_string i in
+                    let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
+                    pat)
+                  fields
+              in
+              Some (Ast.ppat_tuple ~loc fields)
+          | Pcstr_record fields ->
+              let fields =
+                List.mapi
+                  (fun i field ->
+                    let f_idx = "f_" ^ Int.to_string i in
+                    let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
+                    (field.pld_name.txt |> Longident.parse |> Loc.make ~loc, pat))
+                  fields
+              in
+              Some (Ast.ppat_record ~loc fields Closed)
+        in
+
         let lhs =
           Ast.ppat_construct ~loc
             (ctr.pcd_name.txt |> Longident.parse |> Loc.make ~loc)
-            None
+            args
         in
         let rhs = gen_serialize_variant_ctr_impl ~ctxt ~typename idx ctr in
         Ast.case ~lhs ~rhs ~guard:None)
@@ -85,13 +211,26 @@ let gen_serialize_variant_impl ~ctxt typename constructors =
   in
   Ast.pexp_match ~loc [%expr t] cases
 
+let gen_serialize_abstract_impl ~ctxt _typename core_type =
+  let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+  let v = "t" |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
+  ser_fun ~ctxt ~v (Option.get core_type)
+
 let gen_serialize_impl ~ctxt type_decl =
   let loc = Expansion_context.Deriver.derived_item_loc ctxt in
   let body =
     match type_decl with
     | { ptype_kind = Ptype_variant constructors; ptype_name; _ } ->
         gen_serialize_variant_impl ~ctxt ptype_name constructors
-    | _ -> exit 0
+    | {ptype_kind = Ptype_abstract; ptype_name; ptype_manifest; _ } ->
+        gen_serialize_abstract_impl ~ctxt ptype_name ptype_manifest
+    | {ptype_kind ; ptype_name; _} ->
+        [%expr [%e ptype_name.txt |> Ast.estring ~loc ]
+          [%e (match ptype_kind with
+| Ptype_abstract -> "abstract"
+| Ptype_variant _ -> "variant"
+| Ptype_record _ -> "record"
+| Ptype_open -> "open") |>  Ast.estring ~loc ]]
   in
   [%stri
     (** Serialize a value of type `t` into Serde.data *)
@@ -106,11 +245,11 @@ let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
 
 (** interface *)
 
-let generate_intf ~ctxt:_ (_rec_flag, _type_declarations) = exit 0
+let generate_intf ~ctxt:_ (_rec_flag, _type_declarations) = []
 let intf_generator = Deriving.Generator.V2.make_noarg generate_intf
 
 (** registration *)
 
-let deriver =
+let register =
   Deriving.add "serializer" ~str_type_decl:impl_generator
     ~sig_type_decl:intf_generator

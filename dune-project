@@ -27,7 +27,7 @@
  (name serde_derive)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune serde)
+ (depends ocaml dune ppxlib serde)
  (tags
   (topics "to describe" your project)))
 

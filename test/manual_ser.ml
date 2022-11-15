@@ -26,9 +26,9 @@ module Test_variant = struct
         let fields = [ f0 ] in
         Ser.serialize_tuple_variant ~typename:__serde__typename ~variant_idx:1
           ~variant_name:"World" ~variant_size:1 ~fields
-    | Goodbye r ->
-        let* f0 = Ser.serialize_string r.first_name in
-        let* f1 = Ser.serialize_string r.last_name in
+    | Goodbye { first_name: f0; last_name: f1 } ->
+        let* f0 = Ser.serialize_string f0 in
+        let* f1 = Ser.serialize_string f1 in
         let fields = [ ("first_name", f0); ("last_name", f1) ] in
         Ser.serialize_record_variant ~typename:__serde__typename ~variant_idx:2
           ~variant_name:"Goodbye" ~variant_size:2 ~fields
