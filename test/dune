@@ -8,4 +8,4 @@
  (modules test_derive)
  (preprocess
   (pps serde_derive))
- (libraries serde serde_derive serde_sexpr))
+ (libraries serde serde_derive serde_sexpr serde_json))

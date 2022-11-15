@@ -1,0 +1,3 @@
+(library
+ (public_name serde_json)
+ (libraries serde yojson))

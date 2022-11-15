@@ -32,7 +32,7 @@ let _ =
   ]
   |> List.map (fun d ->
          let* value = d in
-         let* sexpr = Serde_sexpr.to_string_pretty value in
+         let* sexpr = Serde_json.to_string_pretty value in
          print_newline ();
          print_string sexpr;
          print_newline ();

@@ -33,6 +33,12 @@
  (name serde_sexpr)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune serde)
+ (depends ocaml dune serde sexplib)
  )
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
+
+(package
+ (name serde_json)
+ (synopsis "A short synopsis")
+ (description "A longer description")
+ (depends ocaml dune serde yojson)
+ )

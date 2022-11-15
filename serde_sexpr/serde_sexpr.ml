@@ -4,7 +4,6 @@ module S = Sexplib.Sexp
 let ( let* ) = Result.bind
 
 module Ser : Ser.Intf with type output = S.t = Ser.Make (struct
-
   type output = S.t
   type error = unit
 

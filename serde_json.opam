@@ -12,7 +12,7 @@ depends: [
   "ocaml"
   "dune" {>= "3.5"}
   "serde"
-  "sexplib"
+  "yojson"
   "odoc" {with-doc}
 ]
 build: [
