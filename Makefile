@@ -10,3 +10,4 @@ fmt:
 
 setup:
 	opam install dune ppxlib ocamlformat ocaml-lsp-server -y
+	opam install sexplib yojson tyxml -y
