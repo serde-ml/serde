@@ -1,49 +1,38 @@
+open Serde
+
 let ( let* ) = Result.bind
 
-type local = bool
+type local = bool [@@deriving serializer]
 
-module Serde_deserialize_local : sig
-  type error = unit
-
-  val deserialize_local :
-    (module Serde.De.Intf) -> (local, error Serde.De.de_error) result
-end = struct
-  type error = unit
-
+module Serde_deserialize_local = struct
   let deserialize_local (module De : Serde.De.Intf) =
     Serde.De.deserialize_bool (module De) (module Serde.De.Impls.Bool_visitor)
+
+  let _ = deserialize_local
 end
 
+include Serde_deserialize_local
+
 module Other = struct
-  type other = int
+  type other = int [@@deriving serializer]
 
-  module Serde_deserialize_other : sig
-    type error = unit
-
-    val deserialize_other :
-      (module Serde.De.Intf) -> (other, error Serde.De.de_error) result
-  end = struct
-    type error = unit
-
+  module Serde_deserialize_other = struct
     let deserialize_other (module De : Serde.De.Intf) =
       Serde.De.deserialize_int (module De) (module Serde.De.Impls.Int_visitor)
+
+    let _ = deserialize_other
   end
 end
 
-type t =
-  | Hello
-  | World of string * Other.other
-  | Salute of { name : string; role : string; clearance : int }
+type t = Hello [@@deriving serializer]
+(* | World of string * Other.other
+   | Salute of { name : string; role : string; clearance : int }
+*)
 
-module Serde_deserialize_t : sig
-  open Serde
+module Serde_deserialize_t = struct
+  (*
 
-  type error
-
-  val deserialize_t : (module De.Intf) -> (t, error) result
-end = struct
   module Serde_deserialize_t_salute = struct
-
     module Serde_deserialize_t_salute_field = struct
       module Visitor : De.Visitor.Intf = struct
         include De.Visitor.Unimplemented
@@ -133,59 +122,68 @@ end = struct
         Ok (Salute { name = f0; role = f1; clearance = f2 })
     end
   end
+*)
 
-  let variants = [ "Hello"; "Nested_tuples"; "World"; "Salute" ]
+  let name = "t"
+  let variants = [ "Hello"; "World"; "Salute" ]
 
-  type error
+  type error = unit
+  type fields = Field_hello
 
-  module Field_visitor = struct
-    type field = Hello | Nested_tuples | World | Salute
+  module Variant_visitor :
+    Serde.De.Visitor.Intf with type value = fields and type error = error =
+  Serde.De.Visitor.Make (struct
+    include Serde.De.Visitor.Unimplemented
 
-    let of_int idx =
+    type value = fields
+    type visitor = unit
+    type error = unit
+
+    let visit_int _visitor idx =
       match idx with
-      | 0 -> Ok Hello
-      | 1 -> Ok Nested_tuples
-      | 2 -> Ok World
-      | 3 -> Ok Salute
-      | _ -> Error (De.Invalid_variant_index { idx })
+      | 0 -> Ok Field_hello
+      | _ -> Error (Serde.De.Invalid_variant_index { idx })
 
-    let of_string str =
+    let visit_str _visitor str =
       match str with
-      | "Hello" -> Ok Hello
-      | "Nested_tuples" -> Ok Nested_tuples
-      | "World" -> Ok World
-      | "Salute" -> Ok Salute
-      | _ -> Error (De.Unknown_variant { str })
-  end
+      | "Hello" -> Ok Field_hello
+      | _ -> Error (Serde.De.Unknown_variant { str })
+  end)
 
-  module Visitor = struct
-    type t = unit
+  module Visitor = Serde.De.Visitor.Make (struct
+    include Serde.De.Visitor.Unimplemented
 
-    include De.Visitor.Unexpected
+    type visitor = unit
+    type value = t
+    type error = unit
 
-    let visit_variant t (module De : De.Intf) =
-      let* variant = De.read_variant_name () in
-      match variant with
-      | Field_visitor.Hello ->
-          let* () = De.read_unit_variant () in
-          Ok Hello
-      | Field_visitor.Salute ->
-          let* f0 = De.read_record_field De.read_string () in
-          let* f1 = De.read_record_field De.read_string () in
-          let* f2 = De.read_record_field De.read_int () in
-          Ok (Salute { name = f0; role = f1; clearance = f2 })
-      | Field_visitor.World ->
-          let* f0 = De.read_tuple_element De.read_string () in
-          let* f1 = De.read_tuple_element Other.deserialize_other () in
-          Ok (World (f0, f1))
-  end
+    let visit_variant _visitor (module De : Serde.De.Intf)
+        (module Var : Serde.De.Variant_access_intf) =
+      let* variant = Var.seed (module Variant_visitor) in
+      match variant with Field_hello -> Ok Hello
+    (* | Variant_visitor.Salute ->
+           let* f0 = De.read_record_field De.read_string () in
+           let* f1 = De.read_record_field De.read_string () in
+           let* f2 = De.read_record_field De.read_int () in
+           Ok (Salute { name = f0; role = f1; clearance = f2 })
+       | Variant_visitor.World ->
+           let* f0 = De.read_tuple_element De.read_string () in
+           let* f1 = De.read_tuple_element Other.deserialize_other () in
+           Ok (World (f0, f1))
+    *)
+  end)
 
-  let deserialize_t (module De : De.Intf) =
-    Serde.De.deserialize_variant
+  let deserialize_t (module De : Serde.De.Intf) =
+    Serde.De.deserialize_variant ~name ~variants
       (module De)
-      variants
       (module Visitor)
-      (module Field_visitor)
+      (module Variant_visitor)
 end
 
 include Serde_deserialize_t
+
+let _ =
+  let t = Serde_sexpr.of_string deserialize_t "Hello" |> Result.get_ok in
+  let sexpr = Serde_sexpr.to_string_pretty serialize_t t |> Result.get_ok in
+  print_string sexpr;
+  Ok ()

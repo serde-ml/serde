@@ -39,19 +39,11 @@ module rec Rec : sig
       (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
       ('value, 'error Error.de_error) result
 
-    val deserialize_unit_variant :
-      'value 'error.
+    val deserialize_variant :
+      'value 'variant 'error.
       (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
-      ('value, 'error Error.de_error) result
-
-    val deserialize_tuple_variant :
-      'value 'error.
-      (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
-      ('value, 'error Error.de_error) result
-
-    val deserialize_record_variant :
-      'value 'error.
-      (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
+      (module Rec.VisitorIntf with type error = 'error and type value = 'variant) ->
+        name:string -> variants:(string list) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_record :
@@ -67,9 +59,8 @@ module rec Rec : sig
 
   module type VariantAccessIntf = sig
     val seed :
-      ((module Rec.DeserializerIntf) -> ('name, 'error Error.de_error) result) ->
-      (module Rec.VisitorIntf) ->
-      ('name option, 'error Error.de_error) result
+      (module Rec.VisitorIntf with type value = 'name) ->
+      ('name, 'error Error.de_error) result
 
     val value :
       ((module Rec.DeserializerIntf) -> ('value, 'error Error.de_error) result) ->
@@ -162,19 +153,11 @@ end = struct
       (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
       ('value, 'error Error.de_error) result
 
-    val deserialize_unit_variant :
-      'value 'error.
+    val deserialize_variant :
+      'value 'variant 'error.
       (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
-      ('value, 'error Error.de_error) result
-
-    val deserialize_tuple_variant :
-      'value 'error.
-      (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
-      ('value, 'error Error.de_error) result
-
-    val deserialize_record_variant :
-      'value 'error.
-      (module Rec.VisitorIntf with type error = 'error and type value = 'value) ->
+      (module Rec.VisitorIntf with type error = 'error and type value = 'variant) ->
+        name:string -> variants:(string list) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_record :
@@ -190,9 +173,8 @@ end = struct
 
   module type VariantAccessIntf = sig
     val seed :
-      ((module Rec.DeserializerIntf) -> ('name, 'error Error.de_error) result) ->
-      (module Rec.VisitorIntf) ->
-      ('name option, 'error Error.de_error) result
+      (module Rec.VisitorIntf with type value = 'name) ->
+      ('name, 'error Error.de_error) result
 
     val value :
       ((module Rec.DeserializerIntf) -> ('value, 'error Error.de_error) result) ->

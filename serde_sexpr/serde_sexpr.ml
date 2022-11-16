@@ -60,10 +60,17 @@ module Serializer : Ser.Intf with type output = S.t = Ser.Make (struct
     Ok (S.List [ S.Atom type_name; S.List fields ])
 end)
 
-module Deserializer : De.Intf = struct
-  include De.Unimplemented
-end
+module Deserializer = Serde.De.Make(struct
+  include Serde.De.Unimplemented
+end)
 
-let to_string_pretty t =
+let to_string_pretty fn t =
+  let* t = fn t in
   let* sexp = Serde.serialize (module Serializer) t in
   Ok (Sexplib.Sexp.to_string_hum sexp)
+
+let of_string de_fn (str: string) =
+  let r = Serde.De.Reader.from_string str in
+  let d = Deserializer.make r in
+  de_fn d 
+

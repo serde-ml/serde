@@ -14,3 +14,7 @@ module Unimplemented = struct
   let visit_seq _visitor _de _seq_access = Error Unimplemented
   let visit_map _visitor _de _map_access = Error Unimplemented
 end
+
+module Make (B: Intf) = struct
+  include B
+end

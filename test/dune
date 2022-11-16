@@ -6,7 +6,9 @@
 (test
  (name manual_de)
  (modules manual_de)
- (libraries serde))
+ (preprocess
+  (pps serde_derive))
+ (libraries serde serde_derive serde_sexpr serde_json serde_xml))
 
 (executable
  (name test_derive)
