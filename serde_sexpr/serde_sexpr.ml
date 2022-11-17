@@ -198,7 +198,7 @@ module Deserializer = Serde.De.Make (struct
         | Some _ -> Error.message "expected closed parenthesis"
         | None -> Error.message "end of stream!")
     | Some c ->
-        Error.message ("expected open parenthesis: found " ^ String.make 1 c)
+        Error.message ("expected ( or : but found " ^ String.make 1 c)
     | None -> Error.message "end of stream!"
 end)
 
