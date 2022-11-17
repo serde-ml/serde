@@ -1,9 +1,4 @@
 (test
- (name manual_ser)
- (modules manual_ser)
- (libraries serde))
-
-(test
  (name manual_de)
  (modules manual_de)
  (preprocess

@@ -1,140 +1,97 @@
 include Error
 
-module type Intf = Intf.Intf
-module type Map_access_intf = Intf.Map_access_intf
-module type Seq_access_intf = Intf.Seq_access_intf
-module type Variant_access_intf = Intf.Variant_access_intf
-
+module Error = Error
 module Impls = Impls
 module Visitor = Visitor
 module Reader = Reader
+module Unimplemented = Unimplemented
 
-module Make (B : Intf): sig 
-  val make : (module Reader.Intf) -> (module Intf)
-end = struct
-  let make _reader = 
+module type Map_access_intf = Intf.Map_access_intf
+module type Seq_access_intf = Intf.Seq_access_intf
+module type Variant_access_intf = Intf.Variant_access_intf
+module type Base = Intf.Deserializer_base_intf
+module type Intf = Intf.Deserializer_intf
+
+module type Factory = sig
+  val make : (module Reader.Instance) -> (module Intf)
+end
+
+module Make (B : Base) : Factory = struct
+  let make (module R : Reader.Instance) =
     let module D = struct
-      type t = { _reader: (module Reader.Intf) }
-      let _state = { _reader }
+      module R = R
       include B
     end in
-    (module D: Intf)
+    (module D : Intf)
 end
 
-module Unimplemented = struct
-  let deserialize_bool :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
+(** boilerplace below is because we don't have modular implicits yet.
+    
+    it threads the two modules manually, and makes sure the all the types are
+    escaping correctly.
+*)
 
-  let deserialize_unit :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-
-  let deserialize_char :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-
-  let deserialize_int :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-
-  let deserialize_float :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-
-  let deserialize_string :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-
-  let deserialize_tuple :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-
-  let deserialize_variant :
-        'value 'variant 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        (module Visitor.Intf with type error = 'error and type value = 'variant) ->
-        name:string ->
-        variants:string list ->
-        ('value, 'error Error.de_error) result =
-   fun _ _ ~name:_ ~variants:_ -> Error Unimplemented
-
-  let deserialize_record :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-
-  let deserialize_identifier :
-        'value 'error.
-        (module Visitor.Intf with type error = 'error and type value = 'value) ->
-        ('value, 'error Error.de_error) result =
-   fun _ -> Error Unimplemented
-end
+let deserialize_unit :
+    type value.
+    (module Intf) ->
+    (module Visitor.Intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun (module De) (module V) -> De.deserialize_unit (module V)
 
 let deserialize_string :
-    type value error.
+    type value.
     (module Intf) ->
-    (module Visitor.Intf with type value = value and type error = error) ->
-    (value, error de_error) result =
+    (module Visitor.Intf with type value = value) ->
+    (value, 'error de_error) result =
  fun (module De) (module V) -> De.deserialize_string (module V)
 
 let deserialize_int :
-    type value error.
+    type value.
     (module Intf) ->
-    (module Visitor.Intf with type value = value and type error = error) ->
-    (value, error de_error) result =
+    (module Visitor.Intf with type value = value) ->
+    (value, 'error de_error) result =
  fun (module De) (module V) -> De.deserialize_int (module V)
 
 let deserialize_bool :
-    type value error.
+    type value.
     (module Intf) ->
-    (module Visitor.Intf with type value = value and type error = error) ->
-    (value, error de_error) result =
+    (module Visitor.Intf with type value = value) ->
+    (value, 'error de_error) result =
  fun (module De) (module V) -> De.deserialize_bool (module V)
 
 let deserialize_identifier :
-    type value error.
+    type value.
     (module Intf) ->
-    (module Visitor.Intf with type value = value and type error = error) ->
-    (value, error de_error) result =
+    (module Visitor.Intf with type value = value) ->
+    (value, 'error de_error) result =
  fun (module De) (module V) -> De.deserialize_identifier (module V)
 
-let deserialize_variant :
-    type value variant error.
+let deserialize_record :
+    type value.
     (module Intf) ->
-    (module Visitor.Intf with type value = value and type error = error) ->
-    (module Visitor.Intf with type value = variant and type error = error) ->
+    (module Visitor.Intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun (module De) (module V) -> De.deserialize_record (module V)
+
+let deserialize_seq :
+    type value.
+    (module Intf) ->
+    (module Visitor.Intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun (module De) (module V) -> De.deserialize_seq (module V)
+
+let deserialize_variant :
+    type value tag.
+    (module Intf) ->
+    (module Visitor.Intf with type value = value) ->
+    (module Visitor.Intf with type value = tag) ->
     name:string ->
     variants:string list ->
-    (value, error de_error) result =
+    (value, 'error de_error) result =
  fun (module De) (module Value) (module Variant) ~name ~variants ->
-  De.deserialize_variant (module Value) (module Variant) ~name ~variants
-
-let deserialize :
-    type value error.
-    (module Visitor.Intf with type value = value and type error = error) ->
-    (module Intf) ->
-    (module Reader.Intf) ->
-    (value, error de_error) result =
- fun (module Visitor) (module De) (module Reader) ->
-  (*
-  let ( let* ) = Result.bind in
-  let visitor = visitor.make (intf.make (reader)) in
-  visitor.do_stuff
-  *)
-  Obj.magic true
+  De.deserialize_variant
+    (module De)
+    (module Value)
+    (module Variant)
+    (module De.R : Reader.Instance)
+    ~name ~variants

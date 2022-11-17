@@ -130,8 +130,7 @@ module Serde_deserialize_t = struct
   type error = unit
   type fields = Field_hello
 
-  module Variant_visitor :
-    Serde.De.Visitor.Intf with type value = fields and type error = error =
+  module Variant_visitor : Serde.De.Visitor.Intf with type value = fields =
   Serde.De.Visitor.Make (struct
     include Serde.De.Visitor.Unimplemented
 
@@ -139,28 +138,33 @@ module Serde_deserialize_t = struct
     type visitor = unit
     type error = unit
 
-    let visit_int _visitor idx =
+    let visit_int idx =
       match idx with
       | 0 -> Ok Field_hello
-      | _ -> Error (Serde.De.Invalid_variant_index { idx })
+      | _ -> Serde.De.Error.invalid_variant_index ~idx
 
-    let visit_str _visitor str =
+    let visit_str str =
       match str with
       | "Hello" -> Ok Field_hello
-      | _ -> Error (Serde.De.Unknown_variant { str })
+      | _ -> Serde.De.Error.unknown_variant str
   end)
 
   module Visitor = Serde.De.Visitor.Make (struct
-    include Serde.De.Visitor.Unimplemented
+    open Serde.De
+    include Visitor.Unimplemented
 
-    type visitor = unit
+    type visitor = bool
     type value = t
-    type error = unit
 
-    let visit_variant _visitor (module De : Serde.De.Intf)
-        (module Var : Serde.De.Variant_access_intf) =
-      let* variant = Var.seed (module Variant_visitor) in
-      match variant with Field_hello -> Ok Hello
+    let visit_variant
+        (module Var : Variant_access_intf
+          with type tag = fields
+           and type value = value) =
+      let* variant = Var.tag () in
+      match variant with
+      | Field_hello ->
+          let* value = Var.unit_variant () in
+          Ok (Option.get value)
     (* | Variant_visitor.Salute ->
            let* f0 = De.read_record_field De.read_string () in
            let* f1 = De.read_record_field De.read_string () in
