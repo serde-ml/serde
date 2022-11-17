@@ -17,5 +17,5 @@ fmt:
 
 .PHONY: setup
 setup:
-	opam install dune ppxlib ocamlformat ocaml-lsp-server -y
+	opam install dune ppxlib ocamlformat ocaml-lsp-server ppx_inline_test -y
 	opam install sexplib yojson tyxml -y
