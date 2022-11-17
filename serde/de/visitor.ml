@@ -18,14 +18,14 @@ module Unimplemented = struct
    fun _ -> Error.unimplemented "visit_string"
 
   let visit_seq :
+      (module Intf.Visitor_intf with type value = 'value) ->
       (module Intf.Deserializer_intf) ->
-      (module Intf.Seq_access_intf) ->
+      ('value, 'error) Sequence_access.t ->
       ('value, 'error Error.de_error) result =
-   fun _ _ -> Error.unimplemented "visit_seq"
+   fun _ _ _ -> Error.unimplemented "visit_seq"
 
   let visit_variant :
-      type variant_value.
-      ('tag, variant_value, 'error) Variant_access.t ->
+      ('tag, 'value, 'error) Variant_access.t ->
       ('value, 'error Error.de_error) result =
    fun _ -> Error.unimplemented "visit_variant"
 

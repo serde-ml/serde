@@ -14,7 +14,10 @@ module Serializer : Ser.Intf with type output = S.t = Ser.Make (struct
   and serialize_unit _ser _output () = Ok (S.Atom "()")
   and serialize_char _ser _output char = Ok (S.Atom (String.make 1 char))
   and serialize_float _ser _output float = Ok (S.Atom (Float.to_string float))
-  and serialize_string _ser _output string = Ok (S.Atom ("\"" ^ string ^ "\""))
+  and serialize_string _ser _output string =
+    Printf.printf "Serde_sexpr.Serializer.serialize_string %s\n" string;
+    let string = if String.contains string ' ' then string else "\"" ^ string ^ "\"" in
+    Ok (S.Atom string)
 
   and serialize_tuple
       (module Ser : Ser.Mapper with type output = output and type error = error)
@@ -28,8 +31,8 @@ module Serializer : Ser.Intf with type output = S.t = Ser.Make (struct
 
   and serialize_tuple_variant
       (module Ser : Ser.Mapper with type output = output and type error = error)
-      _output ~type_name:_ ~variant_index:_ ~variant_name ~variant_size:_ ~fields
-      =
+      _output ~type_name:_ ~variant_index:_ ~variant_name ~variant_size:_
+      ~fields =
     let* fields = Ser.map fields in
 
     Ok (S.List [ S.Atom (":" ^ variant_name); S.List fields ])
@@ -64,7 +67,7 @@ module Deserializer = Serde.De.Make (struct
   open Serde.De
   include Unimplemented
 
-  let _read_str (module Reader : Reader.Instance) str =
+  let _read_keyword (module Reader : Reader.Instance) str =
     let rec aux acc chars =
       match chars with
       | [] -> Ok acc
@@ -88,6 +91,74 @@ module Deserializer = Serde.De.Make (struct
     in
     aux "" (String.to_seq str |> List.of_seq)
 
+  let deserialize_string :
+      type value.
+      (module Deserializer) ->
+      (module Reader.Instance) ->
+      (module Visitor.Intf with type value = value) ->
+      (value, 'error de_error) result =
+   fun _ (module Reader) (module V) ->
+    match Reader.peek () with
+    | Some '"' ->
+        Reader.drop ();
+        let rec acc_str acc =
+          match Reader.peek () with
+          | Some '"' ->
+              Reader.drop ();
+              Ok acc
+          | Some c ->
+              Reader.drop ();
+              acc_str (acc ^ String.make 1 c)
+          | None -> Error.message "unexpected end of string"
+        in
+        let* str = acc_str "" in
+        V.visit_string str
+    | Some c ->
+        Error.message
+          ("expected string to begin with \" (double-quotes), but instead \
+            found: " ^ String.make 1 c)
+    | None -> Error.message "end of stream!"
+
+  let deserialize_seq :
+      type value.
+      (module Deserializer) ->
+      (module Reader.Instance) ->
+      (module Visitor.Intf with type value = value) ->
+      (value, 'error de_error) result =
+   fun (module Self) (module Reader) (module V) ->
+    Reader.skip_whitespace ();
+    match Reader.peek () with
+    | Some '(' -> (
+        Reader.drop ();
+        let seq_access : (value, 'error) Sequence_access.t =
+          {
+            next_element =
+              (fun ~deser_element ->
+                Reader.skip_whitespace ();
+                match Reader.peek () with
+                | Some ')' ->
+                    Reader.drop ();
+                    Ok None
+                | None ->
+                    Error.message
+                      "unexpected end of stream while parsing sequence"
+                | _ ->
+                    let* value = deser_element () in
+                    Ok (Some value));
+          }
+        in
+        let* value = V.visit_seq (module V) (module Self) seq_access in
+        Reader.skip_whitespace ();
+        match Reader.peek () with
+        | Some ')' -> Ok value
+        | Some _ ->
+            Error.message "expected closed parenthesis to close a sequence"
+        | None -> Error.message "unexpected end of stream!")
+    | Some c ->
+        Error.message
+          ("expected ( to begin a sequence but found " ^ String.make 1 c)
+    | None -> Error.message "unexpected end of stream!"
+
   let deserialize_identifier :
       type value.
       (module Deserializer) ->
@@ -101,7 +172,7 @@ module Deserializer = Serde.De.Make (struct
         Reader.drop ();
         let rec acc_str acc =
           match Reader.peek () with
-          | Some (('a' .. 'z' | 'A' .. 'Z' | '-' | '_') as c) ->
+          | Some (('a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_') as c) ->
               Reader.drop ();
               acc_str (acc ^ String.make 1 c)
           | Some _ | None -> Ok acc
@@ -127,78 +198,74 @@ module Deserializer = Serde.De.Make (struct
        ~variants:_ ->
     Reader.skip_whitespace ();
     match Reader.peek () with
-    (* NOTE(@ostera): if we find a :, then we are dealing with a unit variant *)
+    (* NOTE(@ostera): if we find a : then we are dealing with a unit variant
+       (a variant constructor that has no arguments). Since the `:` is part of
+       the variant identifier, we can't drop it.
+    *)
     | Some ':' ->
-        let unit_variant_access : (tag, unit, 'error) Variant_access.t =
-          Variant_access.
-            {
-              tag =
-                (fun () ->
-                  let* id =
-                    Serde.De.deserialize_identifier (module Self) (module Tag)
-                  in
-                  Reader.skip_whitespace ();
-                  Ok id);
-              unit_variant =
-                (fun () ->
-                  Reader.skip_whitespace ();
-                  Ok ());
-              tuple_variant =
-                (fun () ->
-                  Error.message (Printf.sprintf "unexpected tuple variant"));
-              record_variant =
-                (fun () ->
-                  Error.message (Printf.sprintf "unexpected record variant"));
-            }
+        let unit_variant_access : (tag, value, 'error) Variant_access.t =
+          {
+            tag =
+              (fun () ->
+                let* id =
+                  Serde.De.deserialize_identifier (module Self) (module Tag)
+                in
+                Reader.skip_whitespace ();
+                Ok id);
+            unit_variant =
+              (fun () ->
+                Reader.skip_whitespace ();
+                Ok ());
+            tuple_variant =
+              (fun ~len:_ _ ->
+                Error.message (Printf.sprintf "unexpected tuple variant"));
+            record_variant =
+              (fun ~fields:_ ->
+                Error.message (Printf.sprintf "unexpected record variant"));
+          }
         in
         let* value = Val.visit_variant unit_variant_access in
         Reader.skip_whitespace ();
         Ok value
+    (* NOTE(@ostera): if we find a ( then we are dealing with a tuple or record variant.
+    *)
     | Some '(' -> (
         Reader.drop ();
-
-        (* NOTE(@ostera): we will create a new Variant_access module here to facilitate
-            parsing specific variants by looking first at the Tag, getting a typed value
-            that we can match on, and only if we match on something we care about, we
-            will proceed to deserialize the value based on how we know it was serialized.
-        *)
         let variant_access : (tag, value, 'error) Variant_access.t =
-          Variant_access.
-            {
-              tag =
-                (fun () ->
-                  let* id =
-                    Serde.De.deserialize_identifier (module Self) (module Tag)
-                  in
-                  Reader.skip_whitespace ();
-                  Ok id);
-              unit_variant =
-                (fun () ->
-                  Error.message (Printf.sprintf "unexpected unit variant"));
-              tuple_variant =
-                (fun () ->
-                  let* id =
-                    Serde.De.deserialize_seq (module Self) (module Val)
-                  in
-                  Reader.skip_whitespace ();
-                  Ok (Some id));
-              record_variant =
-                (fun () ->
-                  let* id =
-                    Serde.De.deserialize_record (module Self) (module Val)
-                  in
-                  Reader.skip_whitespace ();
-                  Ok (Some id));
-            }
+          {
+            tag =
+              (fun () ->
+                let* id =
+                  Serde.De.deserialize_identifier (module Self) (module Tag)
+                in
+                Reader.skip_whitespace ();
+                Ok id);
+            unit_variant =
+              (fun () ->
+                Error.message (Printf.sprintf "unexpected unit variant"));
+            tuple_variant =
+              (fun ~len:_ v ->
+                let* tuple = Serde.De.deserialize_seq (module Self) v in
+                Reader.skip_whitespace ();
+                Ok tuple);
+            record_variant =
+              (fun ~fields:_ ->
+                let* record =
+                  Serde.De.deserialize_record (module Self) (module Val)
+                in
+                Reader.skip_whitespace ();
+                Ok record);
+          }
         in
         let* value = Val.visit_variant variant_access in
         Reader.skip_whitespace ();
         match Reader.peek () with
         | Some ')' -> Ok value
-        | Some _ -> Error.message "expected closed parenthesis"
+        | Some _ ->
+            Error.message
+              "expected closed parenthesis when parsing tuple/record variant"
         | None -> Error.message "end of stream!")
-    | Some c ->
-        Error.message ("expected ( or : but found " ^ String.make 1 c)
+    | Some c -> Error.message ("expected ( or : but found " ^ String.make 1 c)
     | None -> Error.message "end of stream!"
 end)
 

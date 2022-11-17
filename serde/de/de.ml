@@ -5,9 +5,9 @@ module Visitor = Visitor
 module Reader = Reader
 module Unimplemented = Unimplemented
 module Variant_access = Variant_access
+module Sequence_access = Sequence_access
 
 module type Map_access_intf = Intf.Map_access_intf
-module type Seq_access_intf = Intf.Seq_access_intf
 module type Base = Intf.Deserializer_base_intf
 module type Deserializer = Intf.Deserializer_intf
 

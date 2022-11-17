@@ -3,6 +3,17 @@
    allows all these signatures to be co-recursive. Ugly, but does the job
 *)
 module rec Rec : sig
+  type ('tag, 'value, 'error) variant_access = {
+    tag : unit -> ('tag, 'error Error.de_error) result;
+    unit_variant : unit -> (unit, 'error Error.de_error) result;
+    tuple_variant :
+      len:int ->
+      (module Rec.Visitor_intf with type value = 'value) ->
+      ('value, 'error Error.de_error) result;
+    record_variant :
+      fields:string list -> ('value, 'error Error.de_error) result;
+  }
+
   module type Deserializer_base_intf = sig
     val deserialize_any :
       'value 'error.
@@ -128,13 +139,6 @@ module rec Rec : sig
     include Deserializer_base_intf
   end
 
-  module type Seq_access_intf = sig
-    val next_element :
-      ((module Rec.Deserializer_intf) -> ('value, 'error Error.de_error) result) ->
-      (module Rec.Visitor_intf) ->
-      ('value option, 'error Error.de_error) result
-  end
-
   module type Map_access_intf = sig
     val next_key :
       ((module Rec.Deserializer_intf) -> ('key, 'error Error.de_error) result) ->
@@ -158,12 +162,13 @@ module rec Rec : sig
     val visit_string : string -> (value, 'error Error.de_error) result
 
     val visit_seq :
+      (module Rec.Visitor_intf with type value = value) ->
       (module Rec.Deserializer_intf) ->
-      (module Rec.Seq_access_intf) ->
+      (value, 'error) Sequence_access.t ->
       (value, 'error Error.de_error) result
 
     val visit_variant :
-      (tag, 'variant_value, 'error) Variant_access.t ->
+      (tag, value, 'error) variant_access ->
       (value, 'error Error.de_error) result
 
     val visit_map :
@@ -172,6 +177,17 @@ module rec Rec : sig
       (value, 'error Error.de_error) result
   end
 end = struct
+  type ('tag, 'value, 'error) variant_access = {
+    tag : unit -> ('tag, 'error Error.de_error) result;
+    unit_variant : unit -> (unit, 'error Error.de_error) result;
+    tuple_variant :
+      len:int ->
+      (module Rec.Visitor_intf with type value = 'value) ->
+      ('value, 'error Error.de_error) result;
+    record_variant :
+      fields:string list -> ('value, 'error Error.de_error) result;
+  }
+
   module type Deserializer_base_intf = sig
     val deserialize_any :
       'value 'error.
@@ -297,13 +313,6 @@ end = struct
     include Deserializer_base_intf
   end
 
-  module type Seq_access_intf = sig
-    val next_element :
-      ((module Rec.Deserializer_intf) -> ('value, 'error Error.de_error) result) ->
-      (module Rec.Visitor_intf) ->
-      ('value option, 'error Error.de_error) result
-  end
-
   module type Map_access_intf = sig
     val next_key :
       ((module Rec.Deserializer_intf) -> ('key, 'error Error.de_error) result) ->
@@ -327,12 +336,13 @@ end = struct
     val visit_string : string -> (value, 'error Error.de_error) result
 
     val visit_seq :
+      (module Rec.Visitor_intf with type value = value) ->
       (module Rec.Deserializer_intf) ->
-      (module Rec.Seq_access_intf) ->
+      (value, 'error) Sequence_access.t ->
       (value, 'error Error.de_error) result
 
     val visit_variant :
-      (tag, 'variant_value, 'error) Variant_access.t ->
+      (tag, value, 'error) variant_access ->
       (value, 'error Error.de_error) result
 
     val visit_map :

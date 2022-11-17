@@ -4,27 +4,11 @@ let ( let* ) = Result.bind
 
 type local = bool [@@deriving serializer]
 
-module Serde_deserialize_local = struct
-  let deserialize_local (module De : Serde.De.Deserializer) =
-    Serde.De.deserialize_bool (module De) (module Serde.De.Impls.Bool_visitor)
-
-  let _ = deserialize_local
-end
-
-include Serde_deserialize_local
-
 module Other = struct
   type other = int [@@deriving serializer]
-
-  module Serde_deserialize_other = struct
-    let deserialize_other (module De : Serde.De.Deserializer) =
-      Serde.De.deserialize_int (module De) (module Serde.De.Impls.Int_visitor)
-
-    let _ = deserialize_other
-  end
 end
 
-type t = Hello [@@deriving serializer]
+type t = Hello | Tuple1 of string [@@deriving serializer]
 (* | World of string * Other.other
    | Salute of { name : string; role : string; clearance : int }
 *)
@@ -125,9 +109,9 @@ module Serde_deserialize_t = struct
 *)
 
   let name = "t"
-  let variants = [ "Hello"; "World"; "Salute" ]
+  let variants = [ "Hello"; "Tuple1"; "Salute" ]
 
-  type fields = Field_hello
+  type fields = Field_Hello | Field_Tuple1
 
   module Variant_visitor : Serde.De.Visitor.Intf with type value = fields =
   Serde.De.Visitor.Make (struct
@@ -138,15 +122,46 @@ module Serde_deserialize_t = struct
 
     let visit_int idx =
       match idx with
-      | 0 -> Ok Field_hello
+      | 0 -> Ok Field_Hello
+      | 1 -> Ok Field_Tuple1
       | _ -> Serde.De.Error.invalid_variant_index ~idx
 
     let visit_string str =
       match str with
-      | "Hello" -> Ok Field_hello
+      | "Hello" -> Ok Field_Hello
+      | "Tuple1" -> Ok Field_Tuple1
       | _ -> Serde.De.Error.unknown_variant str
 
     let _ = visit_string
+  end)
+
+  module Field_tuple1_visitor : Serde.De.Visitor.Intf with type value = t =
+  Serde.De.Visitor.Make (struct
+    open Serde.De
+    include Visitor.Unimplemented
+
+    type value = t
+    type tag = unit
+
+    let visit_seq :
+        (module Visitor.Intf with type value = value) ->
+        (module Deserializer) ->
+        (value, 'error) Sequence_access.t ->
+        (value, 'error Error.de_error) result =
+     fun (module Self) (module De) seq_access ->
+      let open Serde.De.Impls in
+      let* f0 =
+        let deser_element () =
+          Serde.De.deserialize_string (module De) (module String_visitor)
+        in
+        Sequence_access.next_element seq_access ~deser_element
+      in
+
+      match f0 with
+      | None -> Error.message (Printf.sprintf "t.Tuple1 needs 1 argument")
+      | Some f0 -> 
+          Printf.printf "Field_tuple1_visitor.visit_seq@f0: %s\n" f0;
+          Ok (Tuple1 f0)
   end)
 
   module Visitor :
@@ -163,9 +178,11 @@ module Serde_deserialize_t = struct
     let visit_variant va =
       let* tag = Variant_access.tag va in
       match tag with
-      | Field_hello ->
+      | Field_Hello ->
           let* () = Variant_access.unit_variant va in
           Ok Hello
+      | Field_Tuple1 ->
+          Variant_access.tuple_variant va ~len:1 (module Field_tuple1_visitor)
     (* | Variant_visitor.Salute ->
            let* f0 = De.read_record_field De.read_string () in
            let* f1 = De.read_record_field De.read_string () in
@@ -187,17 +204,53 @@ end
 
 include Serde_deserialize_t
 
-let _ =
-  print_string "\n";
-  let t = Serde_sexpr.of_string deserialize_t ":Hello" in
-  match t with
+let round_trip str =
+  let* t =
+    str
+    |> Serde_sexpr.of_string deserialize_t
+    |> Result.map_error (fun e -> `De e)
+  in
+  let* t =
+    t
+    |> Serde_sexpr.to_string_pretty serialize_t
+    |> Result.map_error (fun e -> `Ser e)
+  in
+  Ok t
+
+let print str =
+  match round_trip str with
   | Ok t ->
-      let sexpr = Serde_sexpr.to_string_pretty serialize_t t |> Result.get_ok in
-      print_string sexpr
-  | Error (`Unimplemented msg) -> print_string ("unimplemented: " ^ msg)
-  | Error (`Invalid_variant_index _) -> print_string "invalid_va_idx"
-  | Error (`Unknown_variant s) -> print_string ("Unknown_variant: " ^ s)
-  | Error (`Duplicate_field _) -> print_string "Duplicate_field"
-  | Error (`Missing_field _) -> print_string "Missing_field"
-  | Error (`Message msg) -> print_string ("msg: " ^ msg)
-  | _ -> ()
+      Printf.printf "from: %s\nto: %s\n" str t;
+      String.equal t str
+  | Error (`De (`Unimplemented msg)) ->
+      print_string ("unimplemented: " ^ msg);
+      false
+  | Error (`De (`Invalid_variant_index _)) ->
+      print_string "invalid_va_idx";
+      false
+  | Error (`De (`Unknown_variant s)) ->
+      print_string ("Unknown_variant: " ^ s);
+      false
+  | Error (`De (`Duplicate_field _)) ->
+      print_string "Duplicate_field";
+      false
+  | Error (`De (`Missing_field _)) ->
+      print_string "Missing_field";
+      false
+  | Error (`De (`Message msg)) ->
+      print_string ("msg: " ^ msg);
+      false
+  | Error (`Ser _) ->
+      print_string "error serializing";
+      false
+  | _ ->
+      print_string "other";
+      false
+
+let%test "Deserialize unit variant Hello" = print ":Hello"
+
+let%test "Deserialize tuple variant Tuple1(string)" =
+  print "(:Tuple1 (\"asdf\"))"
+
+let%test "Deserialize tuple variant Tuple1(string) with spaces" =
+  print "(:Tuple1 (\"a string with spaces\"))"
