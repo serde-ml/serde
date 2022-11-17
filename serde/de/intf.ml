@@ -7,11 +7,11 @@ module rec Rec : sig
     tag : unit -> ('tag, 'error Error.de_error) result;
     unit_variant : unit -> (unit, 'error Error.de_error) result;
     tuple_variant :
-      len:int ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result;
     record_variant :
-      fields:string list -> ('value, 'error Error.de_error) result;
+      (module Rec.Visitor_intf with type value = 'value) ->
+      ('value, 'error Error.de_error) result;
   }
 
   module type Deserializer_base_intf = sig
@@ -181,11 +181,11 @@ end = struct
     tag : unit -> ('tag, 'error Error.de_error) result;
     unit_variant : unit -> (unit, 'error Error.de_error) result;
     tuple_variant :
-      len:int ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result;
     record_variant :
-      fields:string list -> ('value, 'error Error.de_error) result;
+      (module Rec.Visitor_intf with type value = 'value) ->
+      ('value, 'error Error.de_error) result;
   }
 
   module type Deserializer_base_intf = sig

@@ -132,10 +132,7 @@ let serialize_char value = Ok (Data.Char value)
 let serialize_bool value = Ok (Data.Bool value)
 let serialize_int value = Ok (Data.Int value)
 let serialize_float value = Ok (Data.Float value)
-
-let serialize_string value =
-  Printf.printf "Serde.Ser.serialize_string %s\n" value;
-  Ok (Data.String value)
+let serialize_string value = Ok (Data.String value)
 
 let serialize_tuple ~size:tup_size ~elements:tup_elements =
   Ok (Data.Tuple { tup_size; tup_elements })

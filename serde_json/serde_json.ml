@@ -68,7 +68,8 @@ module Ser : Ser.Intf with type output = Json.t = Ser.Make (struct
     Ok (Json.Object fields)
 end)
 
-let to_string_pretty t =
+let to_string_pretty fn t =
+  let* t = fn t in
   let* json = Serde.serialize (module Ser) t in
   let yojson = Json.to_yojson json in
   Ok (Yojson.Safe.pretty_to_string yojson)

@@ -14,9 +14,11 @@ module Serializer : Ser.Intf with type output = S.t = Ser.Make (struct
   and serialize_unit _ser _output () = Ok (S.Atom "()")
   and serialize_char _ser _output char = Ok (S.Atom (String.make 1 char))
   and serialize_float _ser _output float = Ok (S.Atom (Float.to_string float))
+
   and serialize_string _ser _output string =
-    Printf.printf "Serde_sexpr.Serializer.serialize_string %s\n" string;
-    let string = if String.contains string ' ' then string else "\"" ^ string ^ "\"" in
+    let string =
+      if String.contains string ' ' then string else "\"" ^ string ^ "\""
+    in
     Ok (S.Atom string)
 
   and serialize_tuple
@@ -39,17 +41,13 @@ module Serializer : Ser.Intf with type output = S.t = Ser.Make (struct
 
   and serialize_record_variant
       (module Ser : Ser.Mapper with type output = output and type error = error)
-      _output ~type_name ~variant_index:_ ~variant_name ~variant_size:_ ~fields
-      =
+      _output ~type_name:_ ~variant_index:_ ~variant_name ~variant_size:_
+      ~fields =
     let* fields = Ser.map_field fields in
 
-    let fields =
-      fields
-      |> List.map (fun (name, sexpr) ->
-             S.List [ S.Atom ":name"; S.Atom name; S.Atom ":value"; sexpr ])
-    in
+    let fields = fields |> List.map (fun (_name, sexpr) -> sexpr) in
 
-    Ok (S.List [ S.Atom (type_name ^ "#" ^ variant_name); S.List fields ])
+    Ok (S.List [ S.Atom (":" ^ variant_name); S.List fields ])
 
   and serialize_record
       (module Ser : Ser.Mapper with type output = output and type error = error)
@@ -90,6 +88,56 @@ module Deserializer = Serde.De.Make (struct
               |> Error.message)
     in
     aux "" (String.to_seq str |> List.of_seq)
+
+  let deserialize_int :
+      type value.
+      (module Deserializer) ->
+      (module Reader.Instance) ->
+      (module Visitor.Intf with type value = value) ->
+      (value, 'error de_error) result =
+   fun _ (module Reader) (module V) ->
+    match Reader.peek () with
+    | Some '0' .. '9' -> (
+        let rec acc_int acc =
+          match Reader.peek () with
+          | Some (('0' .. '9' | '.') as c) ->
+              Reader.drop ();
+              acc_int (acc ^ String.make 1 c)
+          | Some _ -> Ok acc
+          | None -> Ok acc
+        in
+        let* int = acc_int "" in
+        match int_of_string_opt int with
+        | Some int -> V.visit_int int
+        | None ->
+            Error.message
+              (Printf.sprintf "could not parse %s into type int" int))
+    | Some c ->
+        Error.message
+          (Printf.sprintf
+             "expected int to begin with a number (0..9) but instead found: %c"
+             c)
+    | None -> Error.message "end of stream!"
+
+  let deserialize_bool :
+      type value.
+      (module Deserializer) ->
+      (module Reader.Instance) ->
+      (module Visitor.Intf with type value = value) ->
+      (value, 'error de_error) result =
+   fun _ (module Reader) (module V) ->
+    match Reader.peek () with
+    | Some 't' ->
+        let* _ = _read_keyword (module Reader) "true" in
+        V.visit_bool true
+    | Some 'f' ->
+        let* _ = _read_keyword (module Reader) "false" in
+        V.visit_bool false
+    | Some c ->
+        Error.message
+          (Printf.sprintf
+             "expected bool to be 'true' or 'false', but instead found: %c" c)
+    | None -> Error.message "end of stream!"
 
   let deserialize_string :
       type value.
@@ -217,10 +265,10 @@ module Deserializer = Serde.De.Make (struct
                 Reader.skip_whitespace ();
                 Ok ());
             tuple_variant =
-              (fun ~len:_ _ ->
+              (fun _ ->
                 Error.message (Printf.sprintf "unexpected tuple variant"));
             record_variant =
-              (fun ~fields:_ ->
+              (fun _ ->
                 Error.message (Printf.sprintf "unexpected record variant"));
           }
         in
@@ -244,15 +292,13 @@ module Deserializer = Serde.De.Make (struct
               (fun () ->
                 Error.message (Printf.sprintf "unexpected unit variant"));
             tuple_variant =
-              (fun ~len:_ v ->
+              (fun v ->
                 let* tuple = Serde.De.deserialize_seq (module Self) v in
                 Reader.skip_whitespace ();
                 Ok tuple);
             record_variant =
-              (fun ~fields:_ ->
-                let* record =
-                  Serde.De.deserialize_record (module Self) (module Val)
-                in
+              (fun v ->
+                let* record = Serde.De.deserialize_seq (module Self) v in
                 Reader.skip_whitespace ();
                 Ok record);
           }

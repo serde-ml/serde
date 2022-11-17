@@ -61,7 +61,5 @@ module String_visitor = struct
   type error = unit
   type tag = unit
 
-  let visit_string str =
-    Printf.printf "String_visitor.visit_string %s\n" str;
-    Ok str
+  let visit_string str = Ok str
 end
