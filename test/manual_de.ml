@@ -14,104 +14,8 @@ type t =
   | Tuple2 of string * bool
   | Record3 of { name : string; favorite_number : int; location : string }
 [@@deriving serializer]
-(* | World of string * Other.other
-*)
 
 module Serde_deserialize_t = struct
-  (*
-
-  module Serde_deserialize_t_salute = struct
-    module Serde_deserialize_t_salute_field = struct
-      module Visitor : De.Visitor.Intf = struct
-        include De.Visitor.Unimplemented
-
-        type visitor = unit
-        type value = Name | Role | Clearance | Ignore__
-        type error = unit
-
-        let visit_int _visitor idx =
-          match idx with
-          | 0 -> Ok Name
-          | 1 -> Ok Role
-          | 2 -> Ok Clearance
-          | _ -> Error (De.Invalid_variant_index { idx })
-
-        let visit_string _visitor str =
-          match str with
-          | "name" -> Ok Name
-          | "role" -> Ok Role
-          | "clearance" -> Ok Clearance
-          | _ -> Error (De.Unknown_variant { str })
-      end
-
-      let deserialize (module De : De.Intf) =
-        Serde.De.deserialize_identifier (module De) (module Visitor)
-    end
-
-    module Visitor = struct
-      include Serde.De.Visitor.Unimplemented
-
-      let visit_seq _visitor (module De : De.Intf)
-          (module Seq : Serde.De.Seq_access_intf) =
-        let* f0 = Seq.next_element De.deserialize_string self in
-        let* f1 = Seq.next_element De.deserialize_string self in
-        let* f2 = Seq.next_element De.deserialize_int self in
-        Ok (Salute { name = f0; role = f1; clearance = f2 })
-
-      let visit_map _visitor (module De : De.Intf)
-          (module Map : Serde.De.Map_access_intf) =
-        let f0 : string option ref = ref None in
-        let f1 : string option ref = ref None in
-        let f2 : int option ref = ref None in
-
-        let rec populate_fields () =
-          match Map.next_key Serde_deserialize_t_salute_field.deserialize with
-          | None -> Ok ()
-          | Some Serde_deserialize_t_salute_field.Visitor.Name ->
-              if Option.is_some f0 then Error (Serde.De.Duplicate_field "name")
-              else
-                let* v = Map.next_value De.deserialize_string () in
-                f0 := Some v;
-                populate_fields ()
-          | Some Field_visitor.Role ->
-              if Option.is_some f1 then Error (Serde.De.Duplicate_field "role")
-              else
-                let* v = Map.next_value De.deserialize_string () in
-                f1 := Some v;
-                populate_fields ()
-          | Some Field_visitor.Clearance ->
-              if Option.is_some f1 then
-                Error (Serde.De.Duplicate_field "clearance")
-              else
-                let* v = Map.next_value De.deserialize_int () in
-                f2 := Some v;
-                populate_fields ()
-          | Some _ -> populate_fields ()
-        in
-
-        let* () = populate_fields () in
-
-        let* f0 =
-          match f0.contents with
-          | None -> Error (Serde.De.Missing_field "name")
-          | Some v -> Ok v
-        in
-        let* f1 =
-          match f1.contents with
-          | None -> Error (Serde.De.Missing_field "role")
-          | Some v -> Ok v
-        in
-        let* f2 =
-          match f2.contents with
-          | None -> Error (Serde.De.Missing_field "clearance")
-          | Some v -> Ok v
-        in
-
-        Ok (Salute { name = f0; role = f1; clearance = f2 })
-    end
-  end
-*)
-
   let name = "t"
   let variants = [ "Hello"; "Tuple1"; "Salute" ]
 
@@ -278,16 +182,6 @@ module Serde_deserialize_t = struct
           Variant_access.tuple_variant va (module Field_Tuple2_visitor)
       | Field_Record3 ->
           Variant_access.record_variant va (module Field_Record3_visitor)
-    (* | Variant_visitor.Salute ->
-           let* f0 = De.read_record_field De.read_string () in
-           let* f1 = De.read_record_field De.read_string () in
-           let* f2 = De.read_record_field De.read_int () in
-           Ok (Salute { name = f0; role = f1; clearance = f2 })
-       | Variant_visitor.World ->
-           let* f0 = De.read_tuple_element De.read_string () in
-           let* f1 = De.read_tuple_elemen Other.deserialize_other () in
-           Ok (World (f0, f1))
-    *)
   end)
 
   let deserialize_t (module De : Serde.De.Deserializer) =
@@ -325,7 +219,8 @@ let round_trip str =
 let print str =
   match round_trip str with
   | Ok (sexpr, json, xml) ->
-      Printf.printf "from: %s\nto (sexpr): %s\nto (json): %s\nto (xml): %s\n\n" str sexpr json xml;
+      Printf.printf "from: %s\nto (sexpr): %s\nto (json): %s\nto (xml): %s\n\n"
+        str sexpr json xml;
       String.equal sexpr str
   | Error (`De (`Unimplemented msg)) ->
       print_string ("unimplemented: " ^ msg);
