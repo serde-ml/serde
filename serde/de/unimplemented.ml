@@ -1,104 +1,133 @@
 open Error
+open Intf
 
 let deserialize_any :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_any"
 
 let deserialize_bool :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_bool"
 
 let deserialize_char :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_char"
 
 let deserialize_int :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_int"
 
 let deserialize_float :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_float"
 
 let deserialize_string :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_string"
 
 let deserialize_unit :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_unit"
 
 let deserialize_tuple :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_tuple"
 
 let deserialize_variant :
-      'value 'tag 'val_error 'tag_error.
-      (module Intf.Deserializer_intf) ->
-      (module Intf.Visitor_intf with type value = 'value) ->
-      (module Intf.Visitor_intf with type value = 'tag) ->
-      (module Reader.Instance) ->
-      name:string ->
-      variants:string list ->
-      ( 'value,
-        [> `Value_error of 'val_error | `Tag_error of 'tag_error ] de_error )
-      result =
- fun _ _ _ _ ~name:_ ~variants:_ -> Error.unimplemented
+    type value tag.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (module Visitor_intf with type value = tag) ->
+    name:string ->
+    variants:string list ->
+    (value, 'error de_error) result =
+ fun _ _ _ _ ~name:_ ~variants:_ -> Error.unimplemented "deserialize_variant"
 
 let deserialize_unit_variant :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_unit_variant"
 
 let deserialize_tuple_variant :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_tuple_variant"
 
 let deserialize_record_variant :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_record_variant"
 
 let deserialize_record :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_record"
 
 let deserialize_seq :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_seq"
 
 let deserialize_map :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_map"
 
 let deserialize_identifier :
-      'value 'error.
-      (module Intf.Visitor_intf with type value = 'value) ->
-      ('value, 'error de_error) result =
- fun _ -> Error.unimplemented
+    type value.
+    (module Deserializer_intf) ->
+    (module Reader.Instance) ->
+    (module Visitor_intf with type value = value) ->
+    (value, 'error de_error) result =
+ fun _ _ _ -> Error.unimplemented "deserialize_identifier"

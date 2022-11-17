@@ -5,7 +5,7 @@ let ( let* ) = Result.bind
 type local = bool [@@deriving serializer]
 
 module Serde_deserialize_local = struct
-  let deserialize_local (module De : Serde.De.Intf) =
+  let deserialize_local (module De : Serde.De.Deserializer) =
     Serde.De.deserialize_bool (module De) (module Serde.De.Impls.Bool_visitor)
 
   let _ = deserialize_local
@@ -17,7 +17,7 @@ module Other = struct
   type other = int [@@deriving serializer]
 
   module Serde_deserialize_other = struct
-    let deserialize_other (module De : Serde.De.Intf) =
+    let deserialize_other (module De : Serde.De.Deserializer) =
       Serde.De.deserialize_int (module De) (module Serde.De.Impls.Int_visitor)
 
     let _ = deserialize_other
@@ -127,7 +127,6 @@ module Serde_deserialize_t = struct
   let name = "t"
   let variants = [ "Hello"; "World"; "Salute" ]
 
-  type error = unit
   type fields = Field_hello
 
   module Variant_visitor : Serde.De.Visitor.Intf with type value = fields =
@@ -135,36 +134,38 @@ module Serde_deserialize_t = struct
     include Serde.De.Visitor.Unimplemented
 
     type value = fields
-    type visitor = unit
-    type error = unit
+    type tag = unit
 
     let visit_int idx =
       match idx with
       | 0 -> Ok Field_hello
       | _ -> Serde.De.Error.invalid_variant_index ~idx
 
-    let visit_str str =
+    let visit_string str =
       match str with
       | "Hello" -> Ok Field_hello
       | _ -> Serde.De.Error.unknown_variant str
+
+    let _ = visit_string
   end)
 
-  module Visitor = Serde.De.Visitor.Make (struct
+  module Visitor :
+    Serde.De.Visitor.Intf with type value = t and type tag = fields =
+  Serde.De.Visitor.Make (struct
     open Serde.De
     include Visitor.Unimplemented
 
-    type visitor = bool
     type value = t
+    type tag = fields
 
-    let visit_variant
-        (module Var : Variant_access_intf
-          with type tag = fields
-           and type value = value) =
-      let* variant = Var.tag () in
-      match variant with
+    let visit_unit () = Ok ()
+
+    let visit_variant va =
+      let* tag = Variant_access.tag va in
+      match tag with
       | Field_hello ->
-          let* value = Var.unit_variant () in
-          Ok (Option.get value)
+          let* () = Variant_access.unit_variant va in
+          Ok Hello
     (* | Variant_visitor.Salute ->
            let* f0 = De.read_record_field De.read_string () in
            let* f1 = De.read_record_field De.read_string () in
@@ -172,12 +173,12 @@ module Serde_deserialize_t = struct
            Ok (Salute { name = f0; role = f1; clearance = f2 })
        | Variant_visitor.World ->
            let* f0 = De.read_tuple_element De.read_string () in
-           let* f1 = De.read_tuple_element Other.deserialize_other () in
+           let* f1 = De.read_tuple_elemen Other.deserialize_other () in
            Ok (World (f0, f1))
     *)
   end)
 
-  let deserialize_t (module De : Serde.De.Intf) =
+  let deserialize_t (module De : Serde.De.Deserializer) =
     Serde.De.deserialize_variant ~name ~variants
       (module De)
       (module Visitor)
@@ -187,7 +188,16 @@ end
 include Serde_deserialize_t
 
 let _ =
-  let t = Serde_sexpr.of_string deserialize_t "Hello" |> Result.get_ok in
-  let sexpr = Serde_sexpr.to_string_pretty serialize_t t |> Result.get_ok in
-  print_string sexpr;
-  Ok ()
+  print_string "\n";
+  let t = Serde_sexpr.of_string deserialize_t ":Hello" in
+  match t with
+  | Ok t ->
+      let sexpr = Serde_sexpr.to_string_pretty serialize_t t |> Result.get_ok in
+      print_string sexpr
+  | Error (`Unimplemented msg) -> print_string ("unimplemented: " ^ msg)
+  | Error (`Invalid_variant_index _) -> print_string "invalid_va_idx"
+  | Error (`Unknown_variant s) -> print_string ("Unknown_variant: " ^ s)
+  | Error (`Duplicate_field _) -> print_string "Duplicate_field"
+  | Error (`Missing_field _) -> print_string "Missing_field"
+  | Error (`Message msg) -> print_string ("msg: " ^ msg)
+  | _ -> ()

@@ -6,50 +6,66 @@ module rec Rec : sig
   module type Deserializer_base_intf = sig
     val deserialize_any :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_bool :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_char :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_int :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_float :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_string :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_unit :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_tuple :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_variant :
       'value 'tag 'val_error 'tag_error.
       (module Rec.Deserializer_intf) ->
-      (module Rec.Visitor_intf with type value = 'value) ->
-      (module Rec.Visitor_intf with type value = 'tag) ->
       (module Reader.Instance) ->
+      (module Rec.Visitor_intf with type value = 'value and type tag = 'tag) ->
+      (module Rec.Visitor_intf with type value = 'tag) ->
       name:string ->
       variants:string list ->
       ( 'value,
@@ -59,36 +75,50 @@ module rec Rec : sig
 
     val deserialize_unit_variant :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_tuple_variant :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_record_variant :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_record :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_seq :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_map :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_identifier :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
   end
@@ -96,16 +126,6 @@ module rec Rec : sig
   module type Deserializer_intf = sig
     module R : Reader.Instance
     include Deserializer_base_intf
-  end
-
-  module type Variant_access_intf = sig
-    type tag
-    type value
-
-    val tag : unit -> (tag, 'error Error.de_error) result
-    val unit_variant : unit -> (value option, 'error Error.de_error) result
-    val tuple_variant : unit -> (value option, 'error Error.de_error) result
-    val record_variant : unit -> (value option, 'error Error.de_error) result
   end
 
   module type Seq_access_intf = sig
@@ -128,9 +148,10 @@ module rec Rec : sig
 
   module type Visitor_intf = sig
     type value
+    type tag
 
     val visit_bool : bool -> (value, 'error Error.de_error) result
-    val visit_unit : unit -> (value, 'error Error.de_error) result
+    val visit_unit : unit -> (unit, 'error Error.de_error) result
     val visit_char : char -> (value, 'error Error.de_error) result
     val visit_int : int -> (value, 'error Error.de_error) result
     val visit_float : float -> (value, 'error Error.de_error) result
@@ -142,7 +163,8 @@ module rec Rec : sig
       (value, 'error Error.de_error) result
 
     val visit_variant :
-      (module Rec.Variant_access_intf) -> (value, 'error Error.de_error) result
+      (tag, 'variant_value, 'error) Variant_access.t ->
+      (value, 'error Error.de_error) result
 
     val visit_map :
       (module Rec.Deserializer_intf) ->
@@ -153,50 +175,66 @@ end = struct
   module type Deserializer_base_intf = sig
     val deserialize_any :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_bool :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_char :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_int :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_float :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_string :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_unit :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_tuple :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_variant :
       'value 'tag 'val_error 'tag_error.
       (module Rec.Deserializer_intf) ->
-      (module Rec.Visitor_intf with type value = 'value) ->
-      (module Rec.Visitor_intf with type value = 'tag) ->
       (module Reader.Instance) ->
+      (module Rec.Visitor_intf with type value = 'value and type tag = 'tag) ->
+      (module Rec.Visitor_intf with type value = 'tag) ->
       name:string ->
       variants:string list ->
       ( 'value,
@@ -206,36 +244,50 @@ end = struct
 
     val deserialize_unit_variant :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_tuple_variant :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_record_variant :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_record :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_seq :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_map :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
     val deserialize_identifier :
       'value 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
   end
@@ -243,16 +295,6 @@ end = struct
   module type Deserializer_intf = sig
     module R : Reader.Instance
     include Deserializer_base_intf
-  end
-
-  module type Variant_access_intf = sig
-    type tag
-    type value
-
-    val tag : unit -> (tag, 'error Error.de_error) result
-    val unit_variant : unit -> (value option, 'error Error.de_error) result
-    val tuple_variant : unit -> (value option, 'error Error.de_error) result
-    val record_variant : unit -> (value option, 'error Error.de_error) result
   end
 
   module type Seq_access_intf = sig
@@ -275,9 +317,10 @@ end = struct
 
   module type Visitor_intf = sig
     type value
+    type tag
 
     val visit_bool : bool -> (value, 'error Error.de_error) result
-    val visit_unit : unit -> (value, 'error Error.de_error) result
+    val visit_unit : unit -> (unit, 'error Error.de_error) result
     val visit_char : char -> (value, 'error Error.de_error) result
     val visit_int : int -> (value, 'error Error.de_error) result
     val visit_float : float -> (value, 'error Error.de_error) result
@@ -289,7 +332,8 @@ end = struct
       (value, 'error Error.de_error) result
 
     val visit_variant :
-      (module Rec.Variant_access_intf) -> (value, 'error Error.de_error) result
+      (tag, 'variant_value, 'error) Variant_access.t ->
+      (value, 'error Error.de_error) result
 
     val visit_map :
       (module Rec.Deserializer_intf) ->
