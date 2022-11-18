@@ -19,13 +19,12 @@ module Serde_deserialize_t = struct
   let name = "t"
   let variants = [ "Hello"; "Tuple1"; "Salute" ]
 
-  type fields = Field_Hello | Field_Tuple1 | Field_Tuple2 | Field_Record3
+  type variants = Field_Hello | Field_Tuple1 | Field_Tuple2 | Field_Record3
 
-  module Variant_visitor : Serde.De.Visitor.Intf with type value = fields =
-  Serde.De.Visitor.Make (struct
+  module Tag_visitor_for_t = Serde.De.Visitor.Make (struct
     include Serde.De.Visitor.Unimplemented
 
-    type value = fields
+    type value = variants
     type tag = unit
 
     let visit_int idx =
@@ -46,8 +45,8 @@ module Serde_deserialize_t = struct
     let _ = visit_string
   end)
 
-  module Field_Tuple1_visitor : Serde.De.Visitor.Intf with type value = t =
-  Serde.De.Visitor.Make (struct
+  module Variant_visitor_for_Tuple1 :
+    Serde.De.Visitor.Intf with type value = t = Serde.De.Visitor.Make (struct
     open Serde.De
     include Visitor.Unimplemented
 
@@ -73,8 +72,8 @@ module Serde_deserialize_t = struct
       Ok (Tuple1 f0)
   end)
 
-  module Field_Tuple2_visitor : Serde.De.Visitor.Intf with type value = t =
-  Serde.De.Visitor.Make (struct
+  module Variant_visitor_for_Tuple2 :
+    Serde.De.Visitor.Intf with type value = t = Serde.De.Visitor.Make (struct
     open Serde.De
     include Visitor.Unimplemented
 
@@ -111,8 +110,8 @@ module Serde_deserialize_t = struct
       Ok (Tuple2 (f0, f1))
   end)
 
-  module Field_Record3_visitor : Serde.De.Visitor.Intf with type value = t =
-  Serde.De.Visitor.Make (struct
+  module Variant_visitor_for_Record3 :
+    Serde.De.Visitor.Intf with type value = t = Serde.De.Visitor.Make (struct
     open Serde.De
     include Visitor.Unimplemented
 
@@ -159,16 +158,14 @@ module Serde_deserialize_t = struct
       Ok (Record3 { name = f0; favorite_number = f1; location = f2 })
   end)
 
-  module Visitor :
-    Serde.De.Visitor.Intf with type value = t and type tag = fields =
+  module Visitor_for_t :
+    Serde.De.Visitor.Intf with type value = t and type tag = variants =
   Serde.De.Visitor.Make (struct
     open Serde.De
     include Visitor.Unimplemented
 
     type value = t
-    type tag = fields
-
-    let visit_unit () = Ok ()
+    type tag = variants
 
     let visit_variant va =
       let* tag = Variant_access.tag va in
@@ -177,18 +174,18 @@ module Serde_deserialize_t = struct
           let* () = Variant_access.unit_variant va in
           Ok Hello
       | Field_Tuple1 ->
-          Variant_access.tuple_variant va (module Field_Tuple1_visitor)
+          Variant_access.tuple_variant va (module Variant_visitor_for_Tuple1)
       | Field_Tuple2 ->
-          Variant_access.tuple_variant va (module Field_Tuple2_visitor)
+          Variant_access.tuple_variant va (module Variant_visitor_for_Tuple2)
       | Field_Record3 ->
-          Variant_access.record_variant va (module Field_Record3_visitor)
+          Variant_access.record_variant va (module Variant_visitor_for_Record3)
   end)
 
   let deserialize_t (module De : Serde.De.Deserializer) =
     Serde.De.deserialize_variant ~name ~variants
       (module De)
-      (module Visitor)
-      (module Variant_visitor)
+      (module Visitor_for_t)
+      (module Tag_visitor_for_t)
 end
 
 include Serde_deserialize_t

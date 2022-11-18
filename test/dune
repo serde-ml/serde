@@ -1,6 +1,14 @@
 (library
  (name manual_de)
- (modules manual_de)
+ (modules manual_de )
+ (inline_tests)
+ (preprocess
+  (pps serde_derive ppx_inline_test))
+ (libraries serde serde_derive serde_sexpr serde_json serde_xml))
+
+(library
+ (name test_derive_de)
+ (modules test_derive_de)
  (inline_tests)
  (preprocess
   (pps serde_derive ppx_inline_test))
