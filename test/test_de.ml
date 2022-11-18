@@ -14,7 +14,6 @@ let parse s t =
   equal t t'
 
 let%test _ = parse ":Hello" Hello
-
 let%test _ = parse "(:Tuple1 (\"this is a tuple\"))" (Tuple1 "this is a tuple")
 
 let%test _ =
@@ -25,3 +24,10 @@ let%test _ =
   parse "(:Record3 (\"Benjamin Sisko\" 9 \"Bajor\"))"
     (Record3
        { name = "Benjamin Sisko"; favorite_number = 9; location = "Bajor" })
+
+open Serde
+
+module A = struct
+  type my_type = Guitar of { name : string; year : int }
+  [@@deriving serializer, deserializer]
+end

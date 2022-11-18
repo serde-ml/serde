@@ -206,7 +206,7 @@ let gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts =
        fun (module Self) (module De) seq_access -> [%e visit_seq]];
   ]
 
-let gen_variant_sub_visitor ~ctxt (variant, _constructor) =
+let gen_variant_sub_visitor ~ctxt ~type_name (variant, _constructor) =
   let loc = loc ~ctxt in
   let visitor_module_name = "Variant_visitor_for_" ^ variant.pcd_name.txt in
 
@@ -229,7 +229,7 @@ let gen_variant_sub_visitor ~ctxt (variant, _constructor) =
     [%str
       include Serde.De.Visitor.Unimplemented
 
-      type value = t
+      type value = [%t Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []]
       type tag = unit]
     @ functions
   in
@@ -240,9 +240,10 @@ let gen_variant_sub_visitor ~ctxt (variant, _constructor) =
       [
         Pwith_type
           ( longident ~ctxt "value",
-            Ast.type_declaration ~loc ~name:(var ~ctxt "t") ~params:[] ~cstrs:[]
-              ~kind:Ptype_abstract
-              ~manifest:(Some (Ast.ptyp_constr ~loc (longident ~ctxt "t") []))
+            Ast.type_declaration ~loc ~name:(var ~ctxt type_name.txt) ~params:[]
+              ~cstrs:[] ~kind:Ptype_abstract
+              ~manifest:
+                (Some (Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []))
               ~private_:Public );
       ]
   in
@@ -261,13 +262,14 @@ let gen_variant_sub_visitor ~ctxt (variant, _constructor) =
 
   (ident, visitor_module)
 
-let gen_variant_visitor ~ctxt typename constructors =
+let gen_variant_visitor ~ctxt type_name constructors =
   let loc = loc ~ctxt in
 
-  let visitor_module_name = "Visitor_for_" ^ typename.txt in
+  let visitor_module_name = "Visitor_for_" ^ type_name.txt in
 
   let _variant_modules_ident, variant_modules =
-    List.map (gen_variant_sub_visitor ~ctxt) constructors |> List.split
+    List.map (gen_variant_sub_visitor ~ctxt ~type_name) constructors
+    |> List.split
   in
 
   let visit_variant =
@@ -317,7 +319,7 @@ let gen_variant_visitor ~ctxt typename constructors =
     [%str
       include Serde.De.Visitor.Unimplemented
 
-      type value = t
+      type value = [%t Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []]
       type tag = variants]
     @ [ visit_variant ]
   in
@@ -328,9 +330,10 @@ let gen_variant_visitor ~ctxt typename constructors =
       [
         Pwith_type
           ( longident ~ctxt "value",
-            Ast.type_declaration ~loc ~name:(var ~ctxt "t") ~params:[] ~cstrs:[]
-              ~kind:Ptype_abstract
-              ~manifest:(Some (Ast.ptyp_constr ~loc (longident ~ctxt "t") []))
+            Ast.type_declaration ~loc ~name:(var ~ctxt type_name.txt) ~params:[]
+              ~cstrs:[] ~kind:Ptype_abstract
+              ~manifest:
+                (Some (Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []))
               ~private_:Public );
         Pwith_type
           ( longident ~ctxt "tag",

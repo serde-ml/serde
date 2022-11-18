@@ -31,18 +31,12 @@ let round_trip str =
     |> Serde_json.to_string_pretty serialize_t
     |> Result.map_error (fun e -> `Ser_json e)
   in
-  let* xml =
-    t
-    |> Serde_xml.to_string_pretty serialize_t
-    |> Result.map_error (fun e -> `Ser_xml e)
-  in
-  Ok (sexpr, json, xml)
+  Ok (sexpr, json)
 
 let print str =
   match round_trip str with
-  | Ok (sexpr, json, xml) ->
-      Printf.printf "from: %s\nto (sexpr): %s\nto (json): %s\nto (xml): %s\n\n"
-        str sexpr json xml;
+  | Ok (sexpr, json) ->
+      Printf.printf "from: %s\nto (sexpr): %s\nto (json): %s\n\n" str sexpr json;
       String.equal sexpr str
   | Error (`De (`Unimplemented msg)) ->
       Printf.printf "unimplemented: %s\n" msg;

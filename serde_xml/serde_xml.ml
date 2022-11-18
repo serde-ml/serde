@@ -139,7 +139,6 @@ module Ser : Ser.Intf with type output = Tyxml.Xml.elt = Ser.Make (struct
          "record" fields)
 end)
 
-let to_string_pretty fn t =
-  let* t = fn t in
+let to_string_pretty t =
   let* xml = Serde.serialize (module Ser) t in
   Ok (Format.asprintf "%a" (Tyxml.Xml.pp ~indent:true ()) xml)
