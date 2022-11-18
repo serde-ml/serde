@@ -49,3 +49,9 @@
  (description "A longer description")
  (depends ocaml dune serde tyxml)
  )
+
+(package
+ (name serde_debug)
+ (synopsis "A short synopsis")
+ (description "A longer description")
+ (depends ocaml dune serde))
