@@ -32,11 +32,14 @@ let de_fun ~ctxt (t : core_type) =
             | _ -> "unknown"
           in
           Ast.pexp_ident ~loc (longident ~ctxt ser_fn_name))
+  | Ptyp_alias (_, _) ->
+      Printf.printf "found alias";
+      [%expr ()]
   (* Unsupported serialization for these *)
-  | Ptyp_tuple _ | Ptyp_any | Ptyp_var _
+  | Ptyp_tuple _ | Ptyp_any
+  | Ptyp_var _
   | Ptyp_object (_, _)
   | Ptyp_class (_, _)
-  | Ptyp_alias (_, _)
   | Ptyp_variant (_, _, _)
   | Ptyp_poly (_, _)
   | Ptyp_package _ | Ptyp_extension _
