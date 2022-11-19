@@ -28,6 +28,9 @@ let print_err err =
   | `De (`Message msg) ->
       print_string ("msg: " ^ msg);
       false
+  | `De (`Unexpected_exception exn) ->
+      print_string ("exn: " ^ (Printexc.to_string exn));
+      false
   | `Ser _ ->
       print_string "error serializing";
       false

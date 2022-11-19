@@ -41,7 +41,9 @@ let deserialize_unit :
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_unit De.state (module De) (module V)
+  match De.deserialize_unit De.state (module De) (module V) with
+  | exception e -> Error.unexpected_exception e
+  | res -> res
 
 let deserialize_string :
     type value state.
@@ -49,7 +51,9 @@ let deserialize_string :
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_string De.state (module De) (module V)
+  match De.deserialize_string De.state (module De) (module V) with
+  | exception e -> Error.unexpected_exception e
+  | res -> res
 
 let deserialize_int :
     type value state.
@@ -57,7 +61,9 @@ let deserialize_int :
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_int De.state (module De) (module V)
+  match De.deserialize_int De.state (module De) (module V) with
+  | exception e -> Error.unexpected_exception e
+  | res -> res
 
 let deserialize_bool :
     type value state.
@@ -65,7 +71,9 @@ let deserialize_bool :
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_bool De.state (module De) (module V)
+  match De.deserialize_bool De.state (module De) (module V) with
+  | exception e -> Error.unexpected_exception e
+  | res -> res
 
 let deserialize_identifier :
     type value state.
@@ -73,7 +81,9 @@ let deserialize_identifier :
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_identifier De.state (module De) (module V)
+  match De.deserialize_identifier De.state (module De) (module V) with
+  | exception e -> Error.unexpected_exception e
+  | res -> res
 
 let deserialize_record :
     type value field state.
@@ -84,11 +94,15 @@ let deserialize_record :
     fields:string list ->
     (value, 'error de_error) result =
  fun (module De) (module Value) (module Field) ~name ~fields ->
-  De.deserialize_record De.state
-    (module De)
-    (module Value)
-    (module Field)
-    ~name ~fields
+  match
+    De.deserialize_record De.state
+      (module De)
+      (module Value)
+      (module Field)
+      ~name ~fields
+  with
+  | exception e -> Error.unexpected_exception e
+  | res -> res
 
 let deserialize_seq :
     type value state.
@@ -96,7 +110,9 @@ let deserialize_seq :
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_seq De.state (module De) (module V)
+  match De.deserialize_seq De.state (module De) (module V) with
+  | exception e -> Error.unexpected_exception e
+  | res -> res
 
 let deserialize_variant :
     type value tag state.
@@ -107,8 +123,12 @@ let deserialize_variant :
     variants:string list ->
     (value, 'error de_error) result =
  fun (module De) (module Value) (module Variant) ~name ~variants ->
-  De.deserialize_variant De.state
-    (module De)
-    (module Value)
-    (module Variant)
-    ~name ~variants
+  match
+    De.deserialize_variant De.state
+      (module De)
+      (module Value)
+      (module Variant)
+      ~name ~variants
+  with
+  | exception e -> Error.unexpected_exception e
+  | res -> res

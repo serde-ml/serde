@@ -29,6 +29,9 @@ let parse eq fn s t =
   | Error (`De (`Message msg)) ->
       print_string ("msg: " ^ msg);
       false
+  | Error (`De (`Unexpected_exception exn)) ->
+      print_string ("exn: " ^ Printexc.to_string exn);
+      false
   | Error (`Ser _) ->
       print_string "error serializing";
       false
