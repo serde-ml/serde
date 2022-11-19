@@ -14,6 +14,16 @@ module rec Rec : sig
       ('value, 'error Error.de_error) result;
   }
 
+  type ('value, 'error) map_access = {
+    next_key :
+      'key.
+      deser_key:(unit -> ('key, 'error Error.de_error) result) ->
+      ('key option, 'error Error.de_error) result;
+    next_value :
+      deser_value:(unit -> ('value, 'error Error.de_error) result) ->
+      ('value option, 'error Error.de_error) result;
+  }
+
   module type Deserializer_base_intf = sig
     type state
 
@@ -142,18 +152,6 @@ module rec Rec : sig
     val state : state
   end
 
-  module type Map_access_intf = sig
-    val next_key :
-      ((module Rec.Deserializer_intf with type state = 'state) ->
-      ('key, 'error Error.de_error) result) ->
-      (module Rec.Visitor_intf) ->
-      ('key option, 'error Error.de_error) result
-
-    val next_value :
-      ((module Rec.Deserializer_intf with type state = 'state) ->
-      ('value, 'error Error.de_error) result) ->
-      ('value option, 'error Error.de_error) result
-  end
 
   module type Visitor_intf = sig
     type value
@@ -180,7 +178,7 @@ module rec Rec : sig
     val visit_map :
       'state.
       (module Rec.Deserializer_intf with type state = 'state) ->
-      (module Rec.Map_access_intf) ->
+      ('state, 'error) map_access ->
       (value, 'error Error.de_error) result
   end
 end = struct
@@ -323,18 +321,15 @@ end = struct
     val state : state
   end
 
-  module type Map_access_intf = sig
-    val next_key :
-      ((module Rec.Deserializer_intf with type state = 'state) ->
-      ('key, 'error Error.de_error) result) ->
-      (module Rec.Visitor_intf) ->
-      ('key option, 'error Error.de_error) result
-
-    val next_value :
-      ((module Rec.Deserializer_intf with type state = 'state) ->
-      ('value, 'error Error.de_error) result) ->
-      ('value option, 'error Error.de_error) result
-  end
+  type ('value, 'error) map_access = {
+    next_key :
+      'key.
+      deser_key:(unit -> ('key, 'error Error.de_error) result) ->
+      ('key option, 'error Error.de_error) result;
+    next_value :
+      deser_value:(unit -> ('value, 'error Error.de_error) result) ->
+      ('value option, 'error Error.de_error) result;
+  }
 
   module type Visitor_intf = sig
     type value
@@ -361,7 +356,7 @@ end = struct
     val visit_map :
       'state.
       (module Rec.Deserializer_intf with type state = 'state) ->
-      (module Rec.Map_access_intf) ->
+      ('state, 'error) map_access ->
       (value, 'error Error.de_error) result
   end
 end

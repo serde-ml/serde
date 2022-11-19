@@ -44,10 +44,9 @@ module Type_alias = struct
 
     let deserialize_alias :
         type de_state.
-        (module Serde.De.Deserializer with type state = de_state) ->
+        de_state Serde.De.Deserializer.t ->
         (alias, 'error Serde.De.de_error) result =
-     fun (module De) ->
-      Serde.De.deserialize_int (module De) (module Serde.De.Impls.Int_visitor)
+     fun de -> Serde.De.deserialize_int de (module Serde.De.Impls.Int_visitor)
   end
 
   include Serde_deserialize_alias

@@ -36,8 +36,8 @@ Serde.De.Make (struct
   let deserialize_int :
       type value.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value) ->
+      state Deserializer.t ->
+      value Visitor.t ->
       (value, 'error de_error) result =
    fun state (module De) (module V) ->
     match Reader.peek state.reader with
@@ -66,8 +66,8 @@ Serde.De.Make (struct
   let deserialize_bool :
       type value.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value) ->
+      state Deserializer.t ->
+      value Visitor.t ->
       (value, 'error de_error) result =
    fun state (module De) (module V) ->
     match Reader.peek state.reader with
@@ -86,8 +86,8 @@ Serde.De.Make (struct
   let deserialize_string :
       type value.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value) ->
+      state Deserializer.t ->
+      value Visitor.t ->
       (value, 'error de_error) result =
    fun state (module De) (module V) ->
     match Reader.peek state.reader with
@@ -114,8 +114,8 @@ Serde.De.Make (struct
   let deserialize_seq :
       type value.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value) ->
+      state Deserializer.t ->
+      value Visitor.t ->
       (value, 'error de_error) result =
    fun state (module Self) (module V) ->
     Reader.skip_whitespace state.reader;
@@ -154,8 +154,8 @@ Serde.De.Make (struct
   let deserialize_identifier :
       type value.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value) ->
+      state Deserializer.t ->
+      value Visitor.t ->
       (value, 'error de_error) result =
    fun state (module De) (module V) ->
     Reader.skip_whitespace state.reader;
@@ -180,9 +180,9 @@ Serde.De.Make (struct
   let deserialize_variant :
       type value tag.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value and type tag = tag) ->
-      (module Visitor.Intf with type value = tag) ->
+      state Deserializer.t ->
+      (value, tag) Visitor.with_tag ->
+      tag Visitor.t ->
       name:string ->
       variants:string list ->
       (value, 'error de_error) result =
@@ -260,9 +260,9 @@ Serde.De.Make (struct
   let deserialize_record :
       type value tag.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value and type tag = tag) ->
-      (module Visitor.Intf with type value = tag) ->
+      state Deserializer.t ->
+      (value, tag) Visitor.with_tag ->
+      tag Visitor.t ->
       name:string ->
       fields:string list ->
       (value, 'error de_error) result =

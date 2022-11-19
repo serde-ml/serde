@@ -1,3 +1,10 @@
+module type Intf = Intf.Visitor_intf
+
+type 'value t = (module Intf with type value = 'value)
+
+type ('value, 'tag) with_tag =
+  (module Intf with type value = 'value and type tag = 'tag)
+
 module Unimplemented = struct
   let visit_bool : bool -> ('value, 'error Error.de_error) result =
    fun _ -> Error.unimplemented "visit_bool"
@@ -19,8 +26,8 @@ module Unimplemented = struct
 
   let visit_seq :
         'state.
-        (module Intf.Visitor_intf with type value = 'value) ->
-        (module Intf.Deserializer_intf with type state = 'state) ->
+        'state t ->
+        'state' Deserializer.t ->
         ('value, 'error) Sequence_access.t ->
         ('value, 'error Error.de_error) result =
    fun _ _ _ -> Error.unimplemented "visit_seq"
@@ -32,13 +39,11 @@ module Unimplemented = struct
 
   let visit_map :
         'state.
-        (module Intf.Deserializer_intf with type state = 'state) ->
-        (module Intf.Map_access_intf) ->
+        'state Deserializer.t ->
+        ('state, 'error) Map_access.t ->
         ('value, 'error Error.de_error) result =
    fun _ _ -> Error.unimplemented "visit_map"
 end
-
-module type Intf = Intf.Visitor_intf
 
 module Make (B : Intf) = struct
   include B

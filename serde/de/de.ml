@@ -1,20 +1,23 @@
 include Error
+
+module Deserializer = Deserializer
+(** API *)
+
 module Error = Error
 module Impls = Impls
-module Visitor = Visitor
 module Reader = Reader
+module Sequence_access = Sequence_access
 module Unimplemented = Unimplemented
 module Variant_access = Variant_access
-module Sequence_access = Sequence_access
+module Visitor = Visitor
 
-module type Map_access_intf = Intf.Map_access_intf
 module type Base = Intf.Deserializer_base_intf
 module type Deserializer = Intf.Deserializer_intf
 
 module type Factory = sig
   type state
 
-  val make : state -> (module Deserializer with type state = state)
+  val make : state -> state Deserializer.t
 end
 
 module Make (B : Base) : Factory with type state = B.state = struct
@@ -37,9 +40,7 @@ end
 
 let deserialize_unit :
     type value state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value) ->
-    (value, 'error de_error) result =
+    state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
  fun (module De) (module V) ->
   match De.deserialize_unit De.state (module De) (module V) with
   | exception e -> Error.unexpected_exception e
@@ -47,9 +48,7 @@ let deserialize_unit :
 
 let deserialize_string :
     type value state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value) ->
-    (value, 'error de_error) result =
+    state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
  fun (module De) (module V) ->
   match De.deserialize_string De.state (module De) (module V) with
   | exception e -> Error.unexpected_exception e
@@ -57,9 +56,7 @@ let deserialize_string :
 
 let deserialize_int :
     type value state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value) ->
-    (value, 'error de_error) result =
+    state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
  fun (module De) (module V) ->
   match De.deserialize_int De.state (module De) (module V) with
   | exception e -> Error.unexpected_exception e
@@ -67,9 +64,7 @@ let deserialize_int :
 
 let deserialize_bool :
     type value state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value) ->
-    (value, 'error de_error) result =
+    state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
  fun (module De) (module V) ->
   match De.deserialize_bool De.state (module De) (module V) with
   | exception e -> Error.unexpected_exception e
@@ -77,9 +72,7 @@ let deserialize_bool :
 
 let deserialize_identifier :
     type value state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value) ->
-    (value, 'error de_error) result =
+    state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
  fun (module De) (module V) ->
   match De.deserialize_identifier De.state (module De) (module V) with
   | exception e -> Error.unexpected_exception e
@@ -87,9 +80,9 @@ let deserialize_identifier :
 
 let deserialize_record :
     type value field state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value and type tag = field) ->
-    (module Visitor.Intf with type value = field) ->
+    state Deserializer.t ->
+    (value, field) Visitor.with_tag ->
+    field Visitor.t ->
     name:string ->
     fields:string list ->
     (value, 'error de_error) result =
@@ -106,9 +99,7 @@ let deserialize_record :
 
 let deserialize_seq :
     type value state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value) ->
-    (value, 'error de_error) result =
+    state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
  fun (module De) (module V) ->
   match De.deserialize_seq De.state (module De) (module V) with
   | exception e -> Error.unexpected_exception e
@@ -116,9 +107,9 @@ let deserialize_seq :
 
 let deserialize_variant :
     type value tag state.
-    (module Deserializer with type state = state) ->
-    (module Visitor.Intf with type value = value and type tag = tag) ->
-    (module Visitor.Intf with type value = tag) ->
+    state Deserializer.t ->
+    (value, tag) Visitor.with_tag ->
+    tag Visitor.t ->
     name:string ->
     variants:string list ->
     (value, 'error de_error) result =

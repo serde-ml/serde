@@ -29,7 +29,7 @@ let print_err err =
       print_string ("msg: " ^ msg);
       false
   | `De (`Unexpected_exception exn) ->
-      print_string ("exn: " ^ (Printexc.to_string exn));
+      print_string ("exn: " ^ Printexc.to_string exn);
       false
   | `Ser _ ->
       print_string "error serializing";
@@ -69,6 +69,7 @@ module Type_tuple = struct
   let parse_json = parse_json equal_tuple deserialize_tuple
 
   let%test _ = parse_sexpr "(21 12 true)" (21, 12, true)
+
   let%test _ = parse_json {|
 
 
