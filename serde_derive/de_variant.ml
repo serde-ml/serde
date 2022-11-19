@@ -33,11 +33,16 @@ let gen_deserialize_record_variant_impl ~ctxt ~variant_name fields =
           |> Ast.estring ~loc
         in
 
+        let deser_element =
+          if is_primitive_type ctyp then
+            [%expr
+              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]]
+          else [%expr [%e de_fun ~ctxt ctyp] (module De)]
+        in
+
         let body =
           [%expr
-            let deser_element () =
-              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]
-            in
+            let deser_element () = [%e deser_element] in
             let* r =
               Serde.De.Sequence_access.next_element seq_access ~deser_element
             in
@@ -99,11 +104,16 @@ let gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts =
           |> Ast.estring ~loc
         in
 
+        let deser_element =
+          if is_primitive_type ctyp then
+            [%expr
+              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]]
+          else [%expr [%e de_fun ~ctxt ctyp] (module De)]
+        in
+
         let body =
           [%expr
-            let deser_element () =
-              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]
-            in
+            let deser_element () = [%e deser_element] in
             let* r =
               Serde.De.Sequence_access.next_element seq_access ~deser_element
             in

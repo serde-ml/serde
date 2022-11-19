@@ -323,13 +323,12 @@ module Deserializer = Serde.De.Make (struct
       name:string ->
       fields:string list ->
       (value, 'error de_error) result =
-   fun (module Self) (module Reader) (module Val) (module Field) ~name
-       ~fields:_ ->
+   fun (module Self) (module Reader) (module Val) (module Field) ~name ~fields:_ ->
     Reader.skip_whitespace ();
     match Reader.peek () with
     | Some '(' -> (
         Reader.drop ();
-        let* _ = _read_keyword (module Reader) (":"^name) in
+        let* _ = _read_keyword (module Reader) (":" ^ name) in
         let seq_access : (value, 'error) Sequence_access.t =
           {
             next_element =

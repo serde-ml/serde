@@ -70,7 +70,6 @@ module Type_record = struct
       { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
 end
 
-(*
 module Type_variant = struct
   type variant =
     | Hello
@@ -79,7 +78,7 @@ module Type_variant = struct
     | Record3 of { name : string; favorite_number : int; location : string }
   [@@deriving eq, serializer, deserializer]
 
-  let parse = parse equals deserialize_variant
+  let parse = parse equal_variant deserialize_variant
 
   let%test _ = parse ":Hello" Hello
 
@@ -87,12 +86,10 @@ module Type_variant = struct
     parse "(:Tuple1 (\"this is a tuple\"))" (Tuple1 "this is a tuple")
 
   let%test _ =
-    parse "(:Tuple2 (\"this is a tuple\"  true))"
-      (Tuple2 ("this is a tuple", true))
+    parse "(:Tuple2 (\"this is a tuple\"  1))" (Tuple2 ("this is a tuple", 1))
 
   let%test _ =
     parse "(:Record3 (\"Benjamin Sisko\" 9 \"Bajor\"))"
       (Record3
          { name = "Benjamin Sisko"; favorite_number = 9; location = "Bajor" })
 end
-*)

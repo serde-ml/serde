@@ -79,10 +79,7 @@ module rec Rec : sig
       (module Rec.Visitor_intf with type value = 'tag) ->
       name:string ->
       variants:string list ->
-      ( 'value,
-        [> `Value_error of 'val_error | `Tag_error of 'tag_error ]
-        Error.de_error )
-      result
+      ('value, 'error Error.de_error) result
 
     val deserialize_unit_variant :
       'value 'error.
@@ -256,10 +253,7 @@ end = struct
       (module Rec.Visitor_intf with type value = 'tag) ->
       name:string ->
       variants:string list ->
-      ( 'value,
-        [> `Value_error of 'val_error | `Tag_error of 'tag_error ]
-        Error.de_error )
-      result
+      ('value, 'error Error.de_error) result
 
     val deserialize_unit_variant :
       'value 'error.
