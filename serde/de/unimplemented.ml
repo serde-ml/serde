@@ -69,7 +69,7 @@ let deserialize_variant :
     type value tag.
     (module Deserializer_intf) ->
     (module Reader.Instance) ->
-    (module Visitor_intf with type value = value) ->
+    (module Visitor_intf with type value = value and type tag = tag) ->
     (module Visitor_intf with type value = tag) ->
     name:string ->
     variants:string list ->

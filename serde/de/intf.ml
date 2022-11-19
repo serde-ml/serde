@@ -72,7 +72,7 @@ module rec Rec : sig
       ('value, 'error Error.de_error) result
 
     val deserialize_variant :
-      'value 'tag 'val_error 'tag_error.
+      'value 'tag.
       (module Rec.Deserializer_intf) ->
       (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value and type tag = 'tag) ->
@@ -246,7 +246,7 @@ end = struct
       ('value, 'error Error.de_error) result
 
     val deserialize_variant :
-      'value 'tag 'val_error 'tag_error.
+      'value 'tag.
       (module Rec.Deserializer_intf) ->
       (module Reader.Instance) ->
       (module Rec.Visitor_intf with type value = 'value and type tag = 'tag) ->
