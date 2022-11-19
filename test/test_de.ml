@@ -77,7 +77,7 @@ module Type_tuple = struct
     21,
     12,
     true
-  ]|} (0, 0, true)
+  ]|} (21, 12, true)
 end
 
 module Type_record = struct

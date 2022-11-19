@@ -23,33 +23,27 @@ module Parser = struct
   let of_string ~string =
     { yojson = Yojson.init_lexer (); lexbuf = Lexing.from_string string }
 
-  let read_int { yojson; lexbuf } =
-    match Yojson.Basic.read_int yojson lexbuf with
-    | exception e ->
-        Serde.De.Error.message
-          (Printf.sprintf "could not read int: %s" (Printexc.to_string e))
+  let _run fn =
+    match fn () with
+    | exception Yojson.Json_error reason -> Serde.De.Error.message reason
     | value -> Ok value
+
+  let read_bool { yojson; lexbuf } =
+    _run (fun () -> Yojson.Safe.read_bool yojson lexbuf)
+
+  let read_int { yojson; lexbuf } =
+    _run (fun () -> Yojson.Safe.read_int yojson lexbuf)
 
   let read_open_bracket { yojson; lexbuf } =
-    match Yojson.Basic.read_lbr yojson lexbuf with
-    | exception e ->
-        Serde.De.Error.message
-          (Printf.sprintf "expected an open bracket: %s" (Printexc.to_string e))
-    | value -> Ok value
+    _run (fun () -> Yojson.Safe.read_lbr yojson lexbuf)
 
   let read_close_bracket { yojson; lexbuf } =
-    match Yojson.Basic.read_rbr yojson lexbuf with
-    | exception e ->
-        Serde.De.Error.message
-          (Printf.sprintf "expected a close bracket: %s" (Printexc.to_string e))
-    | value -> Ok value
+    _run (fun () -> Yojson.Safe.read_rbr yojson lexbuf)
 
   let read_comma { yojson; lexbuf } =
-    match Yojson.Basic.read_comma yojson lexbuf with
-    | exception e ->
-        Serde.De.Error.message
-          (Printf.sprintf "expected a close bracket: %s" (Printexc.to_string e))
-    | value -> Ok value
+    _run (fun () -> Yojson.Safe.read_comma yojson lexbuf)
 
-  let skip_space { yojson; lexbuf } = Yojson.Basic.read_space yojson lexbuf
+  let skip_space { yojson; lexbuf } =
+    _run (fun () -> Yojson.Safe.read_space yojson lexbuf) |> ignore;
+    ()
 end
