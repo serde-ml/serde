@@ -12,16 +12,21 @@ module type Base = Intf.Deserializer_base_intf
 module type Deserializer = Intf.Deserializer_intf
 
 module type Factory = sig
-  val make : (module Reader.Instance) -> (module Deserializer)
+  type state
+
+  val make : state -> (module Deserializer with type state = state)
 end
 
-module Make (B : Base) : Factory = struct
-  let make (module R : Reader.Instance) =
+module Make (B : Base) : Factory with type state = B.state = struct
+  type state = B.state
+
+  let make state =
     let module D = struct
-      module R = R
       include B
+
+      let state = state
     end in
-    (module D : Deserializer)
+    (module D : Deserializer with type state = B.state)
 end
 
 (** boilerplace below is because we don't have modular implicits yet.
@@ -31,84 +36,79 @@ end
 *)
 
 let deserialize_unit :
-    type value.
-    (module Deserializer) ->
+    type value state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_unit (module De) (module De.R : Reader.Instance) (module V)
+  De.deserialize_unit De.state (module De) (module V)
 
 let deserialize_string :
-    type value.
-    (module Deserializer) ->
+    type value state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_string (module De) (module De.R : Reader.Instance) (module V)
+  De.deserialize_string De.state (module De) (module V)
 
 let deserialize_int :
-    type value.
-    (module Deserializer) ->
+    type value state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_int (module De) (module De.R : Reader.Instance) (module V)
+  De.deserialize_int De.state (module De) (module V)
 
 let deserialize_bool :
-    type value.
-    (module Deserializer) ->
+    type value state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_bool (module De) (module De.R : Reader.Instance) (module V)
+  De.deserialize_bool De.state (module De) (module V)
 
 let deserialize_identifier :
-    type value.
-    (module Deserializer) ->
+    type value state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_identifier
-    (module De)
-    (module De.R : Reader.Instance)
-    (module V)
+  De.deserialize_identifier De.state (module De) (module V)
 
 let deserialize_record :
-    type value field.
-    (module Deserializer) ->
+    type value field state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value and type tag = field) ->
     (module Visitor.Intf with type value = field) ->
     name:string ->
     fields:string list ->
     (value, 'error de_error) result =
  fun (module De) (module Value) (module Field) ~name ~fields ->
-  De.deserialize_record
+  De.deserialize_record De.state
     (module De)
-    (module De.R : Reader.Instance)
     (module Value)
     (module Field)
     ~name ~fields
 
 let deserialize_seq :
-    type value.
-    (module Deserializer) ->
+    type value state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value) ->
     (value, 'error de_error) result =
  fun (module De) (module V) ->
-  De.deserialize_seq (module De) (module De.R : Reader.Instance) (module V)
+  De.deserialize_seq De.state (module De) (module V)
 
 let deserialize_variant :
-    type value tag.
-    (module Deserializer) ->
+    type value tag state.
+    (module Deserializer with type state = state) ->
     (module Visitor.Intf with type value = value and type tag = tag) ->
     (module Visitor.Intf with type value = tag) ->
     name:string ->
     variants:string list ->
     (value, 'error de_error) result =
  fun (module De) (module Value) (module Variant) ~name ~variants ->
-  De.deserialize_variant
+  De.deserialize_variant De.state
     (module De)
-    (module De.R : Reader.Instance)
     (module Value)
     (module Variant)
     ~name ~variants

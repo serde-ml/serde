@@ -18,10 +18,11 @@ module Unimplemented = struct
    fun _ -> Error.unimplemented "visit_string"
 
   let visit_seq :
-      (module Intf.Visitor_intf with type value = 'value) ->
-      (module Intf.Deserializer_intf) ->
-      ('value, 'error) Sequence_access.t ->
-      ('value, 'error Error.de_error) result =
+        'state.
+        (module Intf.Visitor_intf with type value = 'value) ->
+        (module Intf.Deserializer_intf with type state = 'state) ->
+        ('value, 'error) Sequence_access.t ->
+        ('value, 'error Error.de_error) result =
    fun _ _ _ -> Error.unimplemented "visit_seq"
 
   let visit_variant :
@@ -30,9 +31,10 @@ module Unimplemented = struct
    fun _ -> Error.unimplemented "visit_variant"
 
   let visit_map :
-      (module Intf.Deserializer_intf) ->
-      (module Intf.Map_access_intf) ->
-      ('value, 'error Error.de_error) result =
+        'state.
+        (module Intf.Deserializer_intf with type state = 'state) ->
+        (module Intf.Map_access_intf) ->
+        ('value, 'error Error.de_error) result =
    fun _ _ -> Error.unimplemented "visit_map"
 end
 
