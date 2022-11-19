@@ -60,7 +60,7 @@ module Type_record = struct
 
   module Serde_deserialize_record = struct
     let name = "record"
-    let fields = [ ("r_name", "r_favorite_number", "r_location") ]
+    let fields = [ "r_name"; "r_favorite_number"; "r_location" ]
 
     type fields = Field_r_name | Field_r_favorite_number | Field_r_location
 
@@ -141,7 +141,7 @@ module Type_record = struct
   let parse = parse equal_record deserialize_record
 
   let%test _ =
-    parse "(:record \"Benjamin Sisko\" 9 \"Bajor\")"
+    parse {|(:record "Benjamin Sisko" 9 "Bajor")|}
       { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
 end
 
@@ -440,14 +440,14 @@ module Type_variant = struct
   *)
 
   let%test "Deserialize tuple variant Tuple1(string) with spaces" =
-    print "(:Tuple1 (\"a string with spaces\"))"
+    print {|(:Tuple1 ("a string with spaces"))|}
 
   let%test "Deserialize tuple variant Tuple2(string, bool) with spaces" =
-    print "(:Tuple2 (\"a string with spaces\" true))"
+    print {|(:Tuple2 ("a string with spaces" true))|}
 
   let%test "Deserialize tuple variant Tuple2(string, bool) with spaces" =
-    print "(:Tuple2 (\"a string with spaces\" false))"
+    print {|(:Tuple2 ("a string with spaces" false))|}
 
   let%test "Deserialize tuple variant Tuple2(string, bool) with spaces" =
-    print "(:Record3 (\"Benjamin Sisko\" 9 \"Deep Space 9\"))"
+    print {|(:Record3 ("Benjamin Sisko" 9 "Deep Space 9"))|}
 end
