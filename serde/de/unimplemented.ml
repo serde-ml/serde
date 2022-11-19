@@ -101,12 +101,15 @@ let deserialize_record_variant :
  fun _ _ _ -> Error.unimplemented "deserialize_record_variant"
 
 let deserialize_record :
-    type value.
-    (module Deserializer_intf) ->
-    (module Reader.Instance) ->
-    (module Visitor_intf with type value = value) ->
-    (value, 'error de_error) result =
- fun _ _ _ -> Error.unimplemented "deserialize_record"
+      'value 'field 'error.
+      (module Rec.Deserializer_intf) ->
+      (module Reader.Instance) ->
+      (module Rec.Visitor_intf with type value = 'value and type tag = 'field) ->
+      (module Rec.Visitor_intf with type value = 'field) ->
+      name:string ->
+      fields:string list ->
+      ('value, 'error Error.de_error) result =
+ fun _ _ _ _ ~name:_ ~fields:_ -> Error.unimplemented "deserialize_record"
 
 let deserialize_seq :
     type value.

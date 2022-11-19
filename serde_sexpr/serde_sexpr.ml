@@ -313,6 +313,49 @@ module Deserializer = Serde.De.Make (struct
         | None -> Error.message "end of stream!")
     | Some c -> Error.message ("expected ( or : but found " ^ String.make 1 c)
     | None -> Error.message "end of stream!"
+
+  let deserialize_record :
+      type value tag.
+      (module Deserializer) ->
+      (module Reader.Instance) ->
+      (module Visitor.Intf with type value = value and type tag = tag) ->
+      (module Visitor.Intf with type value = tag) ->
+      name:string ->
+      fields:string list ->
+      (value, 'error de_error) result =
+   fun (module Self) (module Reader) (module Val) (module Field) ~name
+       ~fields:_ ->
+    Reader.skip_whitespace ();
+    match Reader.peek () with
+    | Some '(' -> (
+        Reader.drop ();
+        let* _ = _read_keyword (module Reader) (":"^name) in
+        let seq_access : (value, 'error) Sequence_access.t =
+          {
+            next_element =
+              (fun ~deser_element ->
+                Reader.skip_whitespace ();
+                match Reader.peek () with
+                | Some ')' ->
+                    Reader.drop ();
+                    Ok None
+                | None ->
+                    Error.message
+                      "unexpected end of stream while parsing sequence"
+                | _ ->
+                    let* value = deser_element () in
+                    Ok (Some value));
+          }
+        in
+        let* value = Val.visit_seq (module Val) (module Self) seq_access in
+        Reader.skip_whitespace ();
+        match Reader.peek () with
+        | Some ')' -> Ok value
+        | Some _ ->
+            Error.message "expected closed parenthesis when parsing a record"
+        | None -> Error.message "end of stream!")
+    | Some c -> Error.message ("expected ( but found " ^ String.make 1 c)
+    | None -> Error.message "end of stream!"
 end)
 
 let to_string_pretty fn t =

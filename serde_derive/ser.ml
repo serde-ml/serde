@@ -292,7 +292,7 @@ let gen_serialize_record_impl ~ctxt typename fields =
 let gen_serialize_abstract_impl ~ctxt _typename core_type =
   let loc = loc ~ctxt in
   let v = "t" |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
-  ser_fun ~ctxt ~v (Option.get core_type)
+  ser_fun ~ctxt ~v core_type
 
 let gen_serialize_impl ~ctxt type_decl =
   let loc = loc ~ctxt in
@@ -305,8 +305,13 @@ let gen_serialize_impl ~ctxt type_decl =
         gen_serialize_variant_impl ~ctxt ptype_name constructors
     | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
         gen_serialize_record_impl ~ctxt ptype_name label_declarations
-    | { ptype_kind = Ptype_abstract; ptype_name; ptype_manifest; _ } ->
-        gen_serialize_abstract_impl ~ctxt ptype_name ptype_manifest
+    | {
+     ptype_kind = Ptype_abstract;
+     ptype_name;
+     ptype_manifest = Some manifest;
+     _;
+    } ->
+        gen_serialize_abstract_impl ~ctxt ptype_name manifest
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with

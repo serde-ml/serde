@@ -106,10 +106,13 @@ module rec Rec : sig
       ('value, 'error Error.de_error) result
 
     val deserialize_record :
-      'value 'error.
+      'value 'field 'error.
       (module Rec.Deserializer_intf) ->
       (module Reader.Instance) ->
-      (module Rec.Visitor_intf with type value = 'value) ->
+      (module Rec.Visitor_intf with type value = 'value and type tag = 'field) ->
+      (module Rec.Visitor_intf with type value = 'field) ->
+      name:string ->
+      fields:string list ->
       ('value, 'error Error.de_error) result
 
     val deserialize_seq :
@@ -280,10 +283,13 @@ end = struct
       ('value, 'error Error.de_error) result
 
     val deserialize_record :
-      'value 'error.
+      'value 'field 'error.
       (module Rec.Deserializer_intf) ->
       (module Reader.Instance) ->
-      (module Rec.Visitor_intf with type value = 'value) ->
+      (module Rec.Visitor_intf with type value = 'value and type tag = 'field) ->
+      (module Rec.Visitor_intf with type value = 'field) ->
+      name:string ->
+      fields:string list ->
       ('value, 'error Error.de_error) result
 
     val deserialize_seq :

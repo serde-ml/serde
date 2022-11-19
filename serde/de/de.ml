@@ -74,12 +74,20 @@ let deserialize_identifier :
     (module V)
 
 let deserialize_record :
-    type value.
+    type value field.
     (module Deserializer) ->
-    (module Visitor.Intf with type value = value) ->
+    (module Visitor.Intf with type value = value and type tag = field) ->
+    (module Visitor.Intf with type value = field) ->
+    name:string ->
+    fields:string list ->
     (value, 'error de_error) result =
- fun (module De) (module V) ->
-  De.deserialize_record (module De) (module De.R : Reader.Instance) (module V)
+ fun (module De) (module Value) (module Field) ~name ~fields ->
+  De.deserialize_record
+    (module De)
+    (module De.R : Reader.Instance)
+    (module Value)
+    (module Field)
+    ~name ~fields
 
 let deserialize_seq :
     type value.
