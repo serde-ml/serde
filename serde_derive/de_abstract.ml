@@ -132,10 +132,23 @@ let gen_deserialize_abstract_impl ~ctxt type_name (manifest : core_type) =
   match manifest.ptyp_desc with
   | Ptyp_tuple parts ->
       gen_deserialize_abstract_tuple_impl ~ctxt type_name.txt parts
-  | _ ->
+  | Ptyp_constr (_, []) ->
       let deserialize_body =
         [%expr
           [%e de_fun ~ctxt manifest] (module De) [%e visitor_mod ~ctxt manifest]]
       in
-
       ([], deserialize_body)
+  | Ptyp_constr (_, _)
+  | Ptyp_any | Ptyp_var _
+  | Ptyp_arrow (_, _, _)
+  | Ptyp_object (_, _)
+  | Ptyp_class (_, _)
+  | Ptyp_alias (_, _)
+  | Ptyp_variant (_, _, _)
+  | Ptyp_poly (_, _)
+  | Ptyp_package _ | Ptyp_extension _ ->
+      ( [],
+        Ast.pexp_extension ~loc
+        @@ Location.error_extensionf ~loc
+             "Can not derive deserializer for abstract type named %s"
+             type_name.txt )
