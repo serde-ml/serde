@@ -40,12 +40,21 @@ let gen_deserialize_impl ~ctxt type_decl =
     "deserialize_" ^ type_name |> var ~ctxt |> Ast.ppat_var ~loc
   in
 
+  let core_type = Ast.ptyp_constr ~loc (longident ~ctxt type_name) [] in
+
+  let deser_sig =
+    [%type:
+      (module Serde.De.Deserializer with type state = de_state) ->
+      ([%t core_type], 'error Serde.De.de_error) result]
+  in
+
+  let deser_fun =
+    Ast.pexp_newtype ~loc (var ~ctxt "de_state")
+      (Ast.pexp_constraint ~loc [%expr fun (module De) -> [%e body]] deser_sig)
+  in
+
   let deserializer_module =
-    let fn =
-      [%stri
-        let [%p deserializer_fn_name] =
-         fun (module De : Serde.De.Deserializer) -> [%e body]]
-    in
+    let fn = [%stri let [%p deserializer_fn_name] = [%e deser_fun]] in
     Ast.pmod_structure ~loc (modules @ [ fn ])
   in
 

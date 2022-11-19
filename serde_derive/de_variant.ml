@@ -67,8 +67,9 @@ let gen_deserialize_record_variant_impl ~ctxt ~variant_name fields =
   [
     [%stri
       let visit_seq :
+          type state.
           (module Serde.De.Visitor.Intf with type value = value) ->
-          (module Serde.De.Deserializer) ->
+          (module Serde.De.Deserializer with type state = state) ->
           (value, 'error) Serde.De.Sequence_access.t ->
           (value, 'error Serde.De.Error.de_error) result =
        fun (module Self) (module De) seq_access -> [%e visit_seq]];
@@ -138,8 +139,9 @@ let gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts =
   [
     [%stri
       let visit_seq :
+          type state.
           (module Serde.De.Visitor.Intf with type value = value) ->
-          (module Serde.De.Deserializer) ->
+          (module Serde.De.Deserializer with type state = state) ->
           (value, 'error) Serde.De.Sequence_access.t ->
           (value, 'error Serde.De.Error.de_error) result =
        fun (module Self) (module De) seq_access -> [%e visit_seq]];

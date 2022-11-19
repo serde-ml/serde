@@ -79,8 +79,9 @@ let gen_deserialize_abstract_tuple_impl ~ctxt type_name parts =
       type tag = unit
 
       let visit_seq :
+          type de_state.
           (module Serde.De.Visitor.Intf with type value = value) ->
-          (module Serde.De.Deserializer) ->
+          (module Serde.De.Deserializer with type state = de_state) ->
           (value, 'error) Serde.De.Sequence_access.t ->
           (value, 'error Serde.De.Error.de_error) result =
        fun (module Self) (module De) seq_access -> [%e visit_seq]]

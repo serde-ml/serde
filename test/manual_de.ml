@@ -39,7 +39,11 @@ module Type_alias = struct
   module Serde_deserialize_alias = struct
     let name = "alias"
 
-    let deserialize_alias (module De : Serde.De.Deserializer) =
+    let deserialize_alias :
+        type de_state.
+        (module Serde.De.Deserializer with type state = de_state) ->
+        (alias, 'error Serde.De.de_error) result =
+     fun (module De) ->
       Serde.De.deserialize_int (module De) (module Serde.De.Impls.Int_visitor)
   end
 
@@ -96,8 +100,9 @@ module Type_record = struct
       type tag = unit
 
       let visit_seq :
+          type de_state.
           (module Visitor.Intf with type value = value) ->
-          (module Deserializer) ->
+          (module Deserializer with type state = de_state) ->
           (value, 'error) Sequence_access.t ->
           (value, 'error Error.de_error) result =
        fun (module Self) (module De) seq_access ->
@@ -159,11 +164,12 @@ module Type_tuple = struct
       type value = tuple
       type tag = unit
 
-      let (visit_seq :
-            (module Visitor.Intf with type value = 'value) ->
-            (module Deserializer) ->
-            (value, 'error) Sequence_access.t ->
-            (value, 'error) result) =
+      let visit_seq :
+          type de_state.
+          (module Visitor.Intf with type value = 'value) ->
+          (module Deserializer with type state = de_state) ->
+          (value, 'error) Sequence_access.t ->
+          (value, 'error) result =
        fun _self (module De) seq_access ->
         let* f0 =
           let deser_element () =
@@ -188,7 +194,11 @@ module Type_tuple = struct
         Ok (f0, f1)
     end)
 
-    let deserialize_tuple (module De : Serde.De.Deserializer) =
+    let deserialize_tuple :
+        type de_state.
+        (module Serde.De.Deserializer with type state = de_state) ->
+        (tuple, 'error Serde.De.de_error) result =
+     fun (module De) ->
       Serde.De.deserialize_seq (module De) (module Visitor_for_tuple)
   end
 
@@ -246,8 +256,9 @@ module Type_variant = struct
       type tag = unit
 
       let visit_seq :
+          type de_state.
           (module Visitor.Intf with type value = value) ->
-          (module Deserializer) ->
+          (module Deserializer with type state = de_state) ->
           (value, 'error) Sequence_access.t ->
           (value, 'error Error.de_error) result =
        fun (module Self) (module De) seq_access ->
@@ -273,8 +284,9 @@ module Type_variant = struct
       type tag = unit
 
       let visit_seq :
+          type de_state.
           (module Visitor.Intf with type value = value) ->
-          (module Deserializer) ->
+          (module Deserializer with type state = de_state) ->
           (value, 'error) Sequence_access.t ->
           (value, 'error Error.de_error) result =
        fun (module Self) (module De) seq_access ->
@@ -311,8 +323,9 @@ module Type_variant = struct
       type tag = unit
 
       let visit_seq :
+          type de_state.
           (module Visitor.Intf with type value = value) ->
-          (module Deserializer) ->
+          (module Deserializer with type state = de_state) ->
           (value, 'error) Sequence_access.t ->
           (value, 'error Error.de_error) result =
        fun (module Self) (module De) seq_access ->
@@ -374,7 +387,11 @@ module Type_variant = struct
               (module Variant_visitor_for_Record3)
     end)
 
-    let deserialize_t (module De : Serde.De.Deserializer) =
+    let deserialize_t :
+        type de_state.
+        (module Serde.De.Deserializer with type state = de_state) ->
+        (t, 'error Serde.De.de_error) result =
+     fun (module De) ->
       Serde.De.deserialize_variant ~name ~variants
         (module De)
         (module Visitor_for_t)
