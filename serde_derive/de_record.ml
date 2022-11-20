@@ -3,11 +3,19 @@ module Ast = Ast_builder.Default
 open De_base
 
 (** implementation *)
-let gen_visit_map ~ctxt ~type_name:_ ~field_visitor kvs parts =
+let gen_visit_map ~ctxt ~type_name:_ ?constructor ~field_visitor kvs parts =
   let loc = loc ~ctxt in
 
   let create_value =
     let value = Ast.pexp_record ~loc kvs None in
+    let value =
+      match constructor with
+      | None -> value
+      | Some c ->
+          Ast.pexp_construct ~loc (longident ~ctxt c)
+            (Some (Ast.pexp_record ~loc kvs None))
+    in
+
     [%expr Ok [%e value]]
   in
 
@@ -84,11 +92,19 @@ let gen_visit_map ~ctxt ~type_name:_ ~field_visitor kvs parts =
         (value, 'error Serde.De.Error.de_error) result =
      fun (module Self) (module De) map_access -> [%e initialize_fields]]
 
-let gen_visit_seq ~ctxt ~type_name kvs parts =
+let gen_visit_seq ~ctxt ~type_name ?constructor kvs parts =
   let loc = loc ~ctxt in
 
   let create_value =
     let value = Ast.pexp_record ~loc kvs None in
+    let value =
+      match constructor with
+      | None -> value
+      | Some c ->
+          Ast.pexp_construct ~loc (longident ~ctxt c)
+            (Some (Ast.pexp_record ~loc kvs None))
+    in
+
     [%expr Ok [%e value]]
   in
 
@@ -182,13 +198,17 @@ let gen_visitor ~ctxt ~type_name ~field_visitor
 
   (ident, visitor_module)
 
-let gen_field_visitor ~ctxt ~type_name constructors =
+let gen_field_visitor ~ctxt ~type_name ?fields_type constructors =
   let loc = loc ~ctxt in
 
   let field_visitor_module_name = "Field_visitor_for_" ^ type_name.txt in
 
   let include_unimplemented = [%stri include Serde.De.Visitor.Unimplemented] in
-  let type_value = [%stri type value = fields] in
+  let type_value =
+    match fields_type with
+    | Some t -> [%stri type value = [%t t]]
+    | None -> [%stri type value = fields]
+  in
   let type_tag = [%stri type tag = unit] in
 
   let visit_int =

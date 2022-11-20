@@ -10,7 +10,10 @@ module rec Rec : sig
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result;
     record_variant :
-      (module Rec.Visitor_intf with type value = 'value) ->
+      'field.
+      (module Rec.Visitor_intf with type value = 'value and type tag = 'field) ->
+      (module Rec.Visitor_intf with type value = 'field) ->
+      fields:string list ->
       ('value, 'error Error.de_error) result;
   }
 
@@ -190,7 +193,10 @@ end = struct
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result;
     record_variant :
-      (module Rec.Visitor_intf with type value = 'value) ->
+      'field.
+      (module Rec.Visitor_intf with type value = 'value and type tag = 'field) ->
+      (module Rec.Visitor_intf with type value = 'field) ->
+      fields:string list ->
       ('value, 'error Error.de_error) result;
   }
 

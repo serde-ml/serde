@@ -155,6 +155,93 @@ Serde.De.Make (struct
               character %c"
              c)
     | None -> Error.message "unexpected end of stream!"
+
+  let deserialize_variant :
+      type value tag.
+      state ->
+      state Deserializer.t ->
+      (value, tag) Visitor.with_tag ->
+      tag Visitor.t ->
+      name:string ->
+      variants:string list ->
+      (value, 'error de_error) result =
+   fun state (module Self) (module Val) (module Tag) ~name ~variants:_ ->
+    Json.Parser.skip_space state;
+    match Json.Parser.peek state with
+    | Some '"' ->
+        let unit_variant_access : (tag, value, 'error) Variant_access.t =
+          {
+            tag =
+              (fun () ->
+                Json.Parser.skip_space state;
+                let* id =
+                  Serde.De.deserialize_identifier (module Self) (module Tag)
+                in
+                Ok id);
+            unit_variant =
+              (fun () ->
+                Json.Parser.skip_space state;
+                Ok ());
+            tuple_variant =
+              (fun _ ->
+                Error.message (Printf.sprintf "unexpected tuple variant"));
+            record_variant =
+              (fun _ _ ~fields:_ ->
+                Error.message (Printf.sprintf "unexpected record variant"));
+          }
+        in
+        let* value = Val.visit_variant unit_variant_access in
+        Ok value
+    | Some '{' -> (
+        let* () = Json.Parser.read_object_start state in
+        let variant_access : (tag, value, 'error) Variant_access.t =
+          {
+            tag =
+              (fun () ->
+                Json.Parser.skip_space state;
+                let* id =
+                  Serde.De.deserialize_identifier (module Self) (module Tag)
+                in
+                Ok id);
+            unit_variant =
+              (fun () ->
+                Error.message (Printf.sprintf "unexpected unit variant"));
+            tuple_variant =
+              (fun v ->
+                let* () = Json.Parser.read_colon state in
+                Json.Parser.skip_space state;
+                let* tuple = Serde.De.deserialize_seq (module Self) v in
+                Ok tuple);
+            record_variant =
+              (fun v field_v ~fields ->
+                let* () = Json.Parser.read_colon state in
+                Json.Parser.skip_space state;
+                let* record =
+                  Serde.De.deserialize_record
+                    (module Self)
+                    v field_v ~name ~fields
+                in
+                Ok record);
+          }
+        in
+        let* value = Val.visit_variant variant_access in
+        Json.Parser.skip_space state;
+        let* () =
+          match Json.Parser.peek state with
+          | Some ',' -> Json.Parser.read_comma state
+          | _ -> Ok ()
+        in
+        Json.Parser.skip_space state;
+        match Json.Parser.peek state with
+        | Some '}' -> Ok value
+        | _ -> Error.message "expected } to close a variant object")
+    | Some c ->
+        Error.message
+          (Printf.sprintf
+             "expected variant to be serialized as an object (beginning with \
+              '{') instead found character %c"
+             c)
+    | None -> Error.message "unexpected end of stream!"
 end)
 
 let of_string ~string =

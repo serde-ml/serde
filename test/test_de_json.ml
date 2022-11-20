@@ -123,9 +123,9 @@ module Type_variant = struct
     parse_json
       {|{
     "Record3": {
-      "r_name": "Benjamin Sisko",
-      "r_favorite_number": 9,
-      "r_location": "Bajor"
+      "name": "Benjamin Sisko",
+      "favorite_number": 9,
+      "location": "Bajor"
     }
   }|}
       (Record3

@@ -6,33 +6,43 @@ let print_err err =
   match err with
   | `De (`Unimplemented msg) ->
       print_string ("unimplemented: " ^ msg);
+      print_newline ();
       false
   | `De (`Invalid_field_index _) ->
       print_string "invalid_field_idx";
+      print_newline ();
       false
   | `De (`Unknown_field s) ->
       print_string ("Unknown_field: " ^ s);
+      print_newline ();
       false
   | `De (`Invalid_variant_index _) ->
       print_string "invalid_va_idx";
+      print_newline ();
       false
   | `De (`Unknown_variant s) ->
       print_string ("Unknown_variant: " ^ s);
+      print_newline ();
       false
   | `De (`Duplicate_field _) ->
       print_string "Duplicate_field";
+      print_newline ();
       false
   | `De (`Missing_field _) ->
       print_string "Missing_field";
+      print_newline ();
       false
   | `De (`Message msg) ->
       print_string ("msg: " ^ msg);
+      print_newline ();
       false
   | `De (`Unexpected_exception exn) ->
       print_string ("exn: " ^ Printexc.to_string exn);
+      print_newline ();
       false
   | `Ser _ ->
       print_string "error serializing";
+      print_newline ();
       false
 
 let parse_json eq fn s t =
@@ -435,53 +445,172 @@ module Type_variant = struct
         Ok (Tuple2 (f0, f1))
     end)
 
+    let _ = name
+    let _fields_Record3 = [ "name"; "favorite_number"; "location" ]
+    let _ = _fields_Record3
+
+    type nonrec _fields_Record3 =
+      | Field_name
+      | Field_favorite_number
+      | Field_location
+
+    module Field_visitor_for_Record3 = Serde.De.Visitor.Make (struct
+      include Serde.De.Visitor.Unimplemented
+
+      type value = _fields_Record3
+      type tag = unit
+
+      let visit_int idx =
+        match idx with
+        | 0 -> Ok Field_name
+        | 1 -> Ok Field_favorite_number
+        | 2 -> Ok Field_location
+        | _ -> Serde.De.Error.invalid_variant_index ~idx
+
+      let _ = visit_int
+
+      let visit_string str =
+        match str with
+        | "name" -> Ok Field_name
+        | "favorite_number" -> Ok Field_favorite_number
+        | "location" -> Ok Field_location
+        | _ -> Serde.De.Error.unknown_variant str
+
+      let _ = visit_string
+    end)
+
     module Variant_visitor_for_Record3 :
-      Serde.De.Visitor.Intf with type value = t = Serde.De.Visitor.Make (struct
-      open Serde.De
-      include Visitor.Unimplemented
+      Serde.De.Visitor.Intf with type value = t and type tag = _fields_Record3 =
+    Serde.De.Visitor.Make (struct
+      include Serde.De.Visitor.Unimplemented
 
       type value = t
-      type tag = unit
+      type tag = _fields_Record3
 
       let visit_seq :
           type de_state.
-          (module Visitor.Intf with type value = value) ->
-          (module Deserializer with type state = de_state) ->
-          (value, 'error) Sequence_access.t ->
-          (value, 'error Error.de_error) result =
+          (module Serde.De.Visitor.Intf with type value = value) ->
+          (module Serde.De.Deserializer with type state = de_state) ->
+          (value, 'error) Serde.De.Sequence_access.t ->
+          (value, 'error Serde.De.Error.de_error) result =
        fun (module Self) (module De) seq_access ->
-        let open Serde.De.Impls in
-        let* f0 =
+        let* f_0 =
           let deser_element () =
-            Serde.De.deserialize_string (module De) (module String_visitor)
+            Serde.De.deserialize_string
+              (module De)
+              (module Serde.De.Impls.String_visitor)
           in
-          let* r = Sequence_access.next_element seq_access ~deser_element in
+          let* r =
+            Serde.De.Sequence_access.next_element seq_access ~deser_element
+          in
           match r with
-          | None -> Error.message (Printf.sprintf "t.Record3 needs 3 argument")
+          | None ->
+              Serde.De.Error.message (Printf.sprintf "Record3 needs 3 argument")
           | Some f0 -> Ok f0
         in
-
-        let* f1 =
+        let* f_1 =
           let deser_element () =
-            Serde.De.deserialize_int (module De) (module Int_visitor)
+            Serde.De.deserialize_int
+              (module De)
+              (module Serde.De.Impls.Int_visitor)
           in
-          let* r = Sequence_access.next_element seq_access ~deser_element in
+          let* r =
+            Serde.De.Sequence_access.next_element seq_access ~deser_element
+          in
           match r with
-          | None -> Error.message (Printf.sprintf "t.Record3 needs 3 argument")
-          | Some f1 -> Ok f1
+          | None ->
+              Serde.De.Error.message (Printf.sprintf "Record3 needs 3 argument")
+          | Some f0 -> Ok f0
         in
-
-        let* f2 =
+        let* f_2 =
           let deser_element () =
-            Serde.De.deserialize_string (module De) (module String_visitor)
+            Serde.De.deserialize_string
+              (module De)
+              (module Serde.De.Impls.String_visitor)
           in
-          let* r = Sequence_access.next_element seq_access ~deser_element in
+          let* r =
+            Serde.De.Sequence_access.next_element seq_access ~deser_element
+          in
           match r with
-          | None -> Error.message (Printf.sprintf "t.Record3 needs 3 argument")
-          | Some f2 -> Ok f2
+          | None ->
+              Serde.De.Error.message (Printf.sprintf "Record3 needs 3 argument")
+          | Some f0 -> Ok f0
         in
+        Ok (Record3 { name = f_0; favorite_number = f_1; location = f_2 })
 
-        Ok (Record3 { name = f0; favorite_number = f1; location = f2 })
+      let _ = visit_seq
+
+      let visit_map :
+          type de_state.
+          value Serde.De.Visitor.t ->
+          de_state Serde.De.Deserializer.t ->
+          (value, 'error) Serde.De.Map_access.t ->
+          (value, 'error Serde.De.Error.de_error) result =
+       fun (module Self) (module De) map_access ->
+        let f_0 = ref None in
+        let f_1 = ref None in
+        let f_2 = ref None in
+        let deser_key () =
+          Serde.De.deserialize_identifier
+            (module De)
+            (module Field_visitor_for_Record3)
+        in
+        let rec fill () =
+          let* key = Serde.De.Map_access.next_key map_access ~deser_key in
+          match key with
+          | None -> Ok ()
+          | Some f ->
+              let* () =
+                match f with
+                | Field_name ->
+                    let* value =
+                      Serde.De.Map_access.next_value map_access
+                        ~deser_value:(fun () ->
+                          Serde.De.deserialize_string
+                            (module De)
+                            (module Serde.De.Impls.String_visitor))
+                    in
+                    Ok (f_0 := value)
+                | Field_favorite_number ->
+                    let* value =
+                      Serde.De.Map_access.next_value map_access
+                        ~deser_value:(fun () ->
+                          Serde.De.deserialize_int
+                            (module De)
+                            (module Serde.De.Impls.Int_visitor))
+                    in
+                    Ok (f_1 := value)
+                | Field_location ->
+                    let* value =
+                      Serde.De.Map_access.next_value map_access
+                        ~deser_value:(fun () ->
+                          Serde.De.deserialize_string
+                            (module De)
+                            (module Serde.De.Impls.String_visitor))
+                    in
+                    Ok (f_2 := value)
+              in
+              fill ()
+        in
+        let* () = fill () in
+        let* f_0 =
+          match !f_0 with
+          | Some value -> Ok value
+          | None -> Serde.De.Error.missing_field "name"
+        in
+        let* f_1 =
+          match !f_1 with
+          | Some value -> Ok value
+          | None -> Serde.De.Error.missing_field "favorite_number"
+        in
+        let* f_2 =
+          match !f_2 with
+          | Some value -> Ok value
+          | None -> Serde.De.Error.missing_field "location"
+        in
+        Ok (Record3 { name = f_0; favorite_number = f_1; location = f_2 })
+
+      let _ = visit_map
     end)
 
     module Visitor_for_t :
@@ -504,8 +633,9 @@ module Type_variant = struct
         | Field_Tuple2 ->
             Variant_access.tuple_variant va (module Variant_visitor_for_Tuple2)
         | Field_Record3 ->
-            Variant_access.record_variant va
+            Variant_access.record_variant va ~fields:_fields_Record3
               (module Variant_visitor_for_Record3)
+              (module Field_visitor_for_Record3)
     end)
 
     let deserialize_t :
@@ -547,27 +677,35 @@ module Type_variant = struct
         String.equal sexpr str
     | Error (`De (`Unimplemented msg)) ->
         print_string ("unimplemented: " ^ msg);
+        print_newline ();
         false
     | Error (`De (`Invalid_variant_index _)) ->
         print_string "invalid_va_idx";
+        print_newline ();
         false
     | Error (`De (`Unknown_variant s)) ->
         print_string ("Unknown_variant: " ^ s);
+        print_newline ();
         false
     | Error (`De (`Duplicate_field _)) ->
         print_string "Duplicate_field";
+        print_newline ();
         false
     | Error (`De (`Missing_field _)) ->
         print_string "Missing_field";
+        print_newline ();
         false
     | Error (`De (`Message msg)) ->
         print_string ("msg: " ^ msg);
+        print_newline ();
         false
     | Error (`Ser _) ->
         print_string "error serializing";
+        print_newline ();
         false
     | _ ->
         print_string "other";
+        print_newline ();
         false
 
   let%test "Deserialize unit variant Hello" = print ":Hello"
@@ -586,6 +724,7 @@ module Type_variant = struct
   let%test "Deserialize tuple variant Tuple2(string, bool) with spaces" =
     print {|(:Tuple2 ("a string with spaces" false))|}
 
-  let%test "Deserialize tuple variant Tuple2(string, bool) with spaces" =
+  let%test "Deserialize tuple variant Record3({ name : string; favorite_number \
+            : int; location : string }) with spaces" =
     print {|(:Record3 ("Benjamin Sisko" 9 "Deep Space 9"))|}
 end

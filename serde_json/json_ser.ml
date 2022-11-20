@@ -20,22 +20,24 @@ and serialize_tuple
   let* parts = Ser.map elements in
   Ok (Json.Array parts)
 
-and serialize_unit_variant _ser _output ~type_name ~variant_name
+and serialize_unit_variant _ser _output ~type_name:_ ~variant_name
     ~variant_index:_ =
-  Ok (Json.String (type_name ^ "#" ^ variant_name))
+  Ok (Json.String variant_name)
 
 and serialize_tuple_variant
     (module Ser : Ser.Mapper with type output = output and type error = error)
-    _output ~type_name ~variant_index:_ ~variant_name ~variant_size:_ ~fields =
+    _output ~type_name:_ ~variant_index:_ ~variant_name ~variant_size:_ ~fields
+    =
   let* fields = Ser.map fields in
 
-  Ok (Json.Object [ (type_name ^ "#" ^ variant_name, Json.Array fields) ])
+  Ok (Json.Object [ (variant_name, Json.Array fields) ])
 
 and serialize_record_variant
     (module Ser : Ser.Mapper with type output = output and type error = error)
-    _output ~type_name ~variant_index:_ ~variant_name ~variant_size:_ ~fields =
+    _output ~type_name:_ ~variant_index:_ ~variant_name ~variant_size:_ ~fields
+    =
   let* fields = Ser.map_field fields in
-  Ok (Json.Object [ (type_name ^ "#" ^ variant_name, Json.Object fields) ])
+  Ok (Json.Object [ (variant_name, Json.Object fields) ])
 
 and serialize_record
     (module Ser : Ser.Mapper with type output = output and type error = error)

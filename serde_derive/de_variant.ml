@@ -6,74 +6,77 @@ open De_base
 let gen_deserialize_record_variant_impl ~ctxt ~variant_name fields =
   let loc = loc ~ctxt in
 
-  let make_vars_and_pats i ldecl =
+  let make_vars_and_pats i (ldecl, field_variant) =
+    let record_field_name = ldecl.pld_name.txt in
     let f_idx = "f_" ^ Int.to_string i in
     let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
     let var = f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
-    let kv = (longident ~ctxt ldecl.pld_name.txt, var) in
-    (kv, (pat, ldecl.pld_type))
+    let kv = (longident ~ctxt record_field_name, var) in
+    (kv, (record_field_name, pat, ldecl.pld_type, var, field_variant))
   in
 
-  let kvs, parts = fields |> List.mapi make_vars_and_pats |> List.split in
+  let field_constructors =
+    List.map (fun l -> (l, "Field_" ^ l.pld_name.txt)) fields
+  in
+  let kvs, parts =
+    field_constructors |> List.mapi make_vars_and_pats |> List.split
+  in
 
-  let create_value =
-    let value =
-      Ast.pexp_construct ~loc
-        (longident ~ctxt variant_name)
-        (Some (Ast.pexp_record ~loc kvs None))
+  let fields =
+    let kind =
+      Ptype_variant
+        (List.map
+           (fun (_name, _pat, _ctyp, _var, c) ->
+             let name = var ~ctxt c in
+             Ast.constructor_declaration ~loc ~name ~res:None
+               ~args:(Pcstr_tuple []))
+           parts)
     in
-    [%expr Ok [%e value]]
+    [
+      Ast.type_declaration ~loc
+        ~name:(var ~ctxt ("_fields_" ^ variant_name))
+        ~params:[] ~cstrs:[] ~kind ~manifest:None ~private_:Public;
+    ]
+    |> Ast.pstr_type ~loc Nonrecursive
   in
 
-  let exprs =
-    List.map
-      (fun (pat, ctyp) ->
-        let err_msg =
-          Printf.sprintf "%s needs %d argument" variant_name (List.length parts)
-          |> Ast.estring ~loc
-        in
-
-        let deser_element =
-          if is_primitive_type ctyp then
-            [%expr
-              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]]
-          else [%expr [%e de_fun ~ctxt ctyp] (module De)]
-        in
-
-        let body =
-          [%expr
-            let deser_element () = [%e deser_element] in
-            let* r =
-              Serde.De.Sequence_access.next_element seq_access ~deser_element
-            in
-            match r with
-            | None -> Serde.De.Error.message (Printf.sprintf [%e err_msg])
-            | Some f0 -> Ok f0]
-        in
-
-        (pat, body))
-      parts
+  let constants =
+    [
+      [%stri let name = [%e variant_name |> Ast.estring ~loc]];
+      [%stri
+        let [%p "_fields_" ^ variant_name |> var ~ctxt |> Ast.ppat_var ~loc] =
+          [%e
+            parts
+            |> List.map (fun (name, _pat, _typ, _expr, _variant) ->
+                   Ast.estring ~loc name)
+            |> Ast.elist ~loc]];
+      fields;
+    ]
   in
 
-  let visit_seq =
-    List.fold_left
-      (fun body (pat, exp) ->
-        let op = var ~ctxt "let*" in
-        let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
-        Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
-      create_value (List.rev exprs)
+  let type_name = variant_name |> var ~ctxt in
+
+  let field_visitor, field_visitor_module =
+    De_record.gen_field_visitor ~ctxt ~type_name
+      ~fields_type:
+        (let name = "_fields_" ^ variant_name |> longident ~ctxt in
+         Ast.ptyp_constr ~loc name [])
+      field_constructors
   in
 
-  [
-    [%stri
-      let visit_seq :
-          type state.
-          (module Serde.De.Visitor.Intf with type value = value) ->
-          (module Serde.De.Deserializer with type state = state) ->
-          (value, 'error) Serde.De.Sequence_access.t ->
-          (value, 'error Serde.De.Error.de_error) result =
-       fun (module Self) (module De) seq_access -> [%e visit_seq]];
-  ]
+  ( constants @ [ field_visitor_module ],
+    [
+      [%stri
+        type tag =
+          [%t
+            let name = "_fields_" ^ variant_name |> longident ~ctxt in
+            Ast.ptyp_constr ~loc name []]];
+      De_record.gen_visit_seq ~ctxt ~type_name ~constructor:variant_name kvs
+        parts;
+      De_record.gen_visit_map ~ctxt ~type_name ~constructor:variant_name
+        ~field_visitor kvs parts;
+    ],
+    "_fields_" ^ variant_name )
 
 let gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts =
   let loc = loc ~ctxt in
@@ -137,6 +140,7 @@ let gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts =
   in
 
   [
+    [%stri type tag = unit];
     [%stri
       let visit_seq :
           type state.
@@ -156,12 +160,14 @@ let gen_variant_sub_visitor ~ctxt ~type_name (variant, _constructor) =
     Ast.pexp_pack ~loc (Ast.pmod_ident ~loc mod_name)
   in
 
-  let submodules =
+  let sibling_modules, main_module, tag_type_name =
     let variant_name = variant.pcd_name.txt in
     match variant.pcd_args with
-    | Pcstr_tuple [] -> []
+    | Pcstr_tuple [] -> ([], [ [%stri type tag = unit] ], "unit")
     | Pcstr_tuple parts ->
-        gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts
+        ( [],
+          gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts,
+          "unit" )
     | Pcstr_record fields ->
         gen_deserialize_record_variant_impl ~ctxt ~variant_name fields
   in
@@ -170,9 +176,8 @@ let gen_variant_sub_visitor ~ctxt ~type_name (variant, _constructor) =
     [%str
       include Serde.De.Visitor.Unimplemented
 
-      type value = [%t Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []]
-      type tag = unit]
-    @ submodules
+      type value = [%t Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []]]
+    @ main_module
   in
 
   let visitor_signature =
@@ -185,6 +190,13 @@ let gen_variant_sub_visitor ~ctxt ~type_name (variant, _constructor) =
               ~cstrs:[] ~kind:Ptype_abstract
               ~manifest:
                 (Some (Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []))
+              ~private_:Public );
+        Pwith_type
+          ( longident ~ctxt "tag",
+            Ast.type_declaration ~loc ~name:(var ~ctxt tag_type_name) ~params:[]
+              ~cstrs:[] ~kind:Ptype_abstract
+              ~manifest:
+                (Some (Ast.ptyp_constr ~loc (longident ~ctxt tag_type_name) []))
               ~private_:Public );
       ]
   in
@@ -201,7 +213,7 @@ let gen_variant_sub_visitor ~ctxt ~type_name (variant, _constructor) =
     |> Ast.pstr_module ~loc
   in
 
-  (ident, visitor_module)
+  (ident, sibling_modules @ [ visitor_module ])
 
 let gen_variant_visitor ~ctxt type_name constructors =
   let loc = loc ~ctxt in
@@ -212,6 +224,7 @@ let gen_variant_visitor ~ctxt type_name constructors =
     List.map (gen_variant_sub_visitor ~ctxt ~type_name) constructors
     |> List.split
   in
+  let variant_modules = List.flatten variant_modules in
 
   let visit_variant =
     let cases =
@@ -240,9 +253,21 @@ let gen_variant_visitor ~ctxt type_name constructors =
                      Serde.De.Variant_access.tuple_variant va
                        [%e variant_visitor_mod_ident]]
                | Pcstr_record _ ->
+                   let field_visitor_mod_ident =
+                     let mod_name =
+                       "Field_visitor_for_" ^ variant.pcd_name.txt
+                       |> Longident.parse |> var ~ctxt
+                     in
+                     Ast.pexp_pack ~loc (Ast.pmod_ident ~loc mod_name)
+                   in
+                   let fields =
+                     "_fields_" ^ variant.pcd_name.txt
+                     |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc
+                   in
                    [%expr
                      Serde.De.Variant_access.record_variant va
-                       [%e variant_visitor_mod_ident]]
+                       ~fields:[%e fields] [%e variant_visitor_mod_ident]
+                       [%e field_visitor_mod_ident]]
              in
              Ast.case
                ~lhs:(Ast.ppat_construct ~loc (longident ~ctxt constructor) None)

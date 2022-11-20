@@ -1,30 +1,7 @@
 (library
  (name test_de)
- (modules test_de)
+ (modules test_de_json test_de_sexpr)
  (inline_tests)
  (preprocess
   (pps serde_derive ppx_inline_test ppx_deriving.eq))
  (libraries serde serde_derive serde_sexpr serde_json serde_xml ppx_deriving))
-
-(library
- (name manual_de)
- (modules manual_de)
- (inline_tests)
- (preprocess
-  (pps serde_derive ppx_inline_test ppx_deriving.eq))
- (libraries serde serde_derive serde_sexpr serde_json serde_xml))
-
-(library
- (name test_derive_de)
- (modules test_derive_de)
- (inline_tests)
- (preprocess
-  (pps serde_derive ppx_inline_test))
- (libraries serde serde_derive serde_sexpr serde_json serde_xml))
-
-(executable
- (name test_derive)
- (modules test_derive)
- (preprocess
-  (pps serde_derive))
- (libraries serde serde_derive serde_sexpr serde_json serde_xml))

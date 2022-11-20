@@ -186,7 +186,7 @@ Serde.De.Make (struct
       name:string ->
       variants:string list ->
       (value, 'error de_error) result =
-   fun state (module Self) (module Val) (module Tag) ~name:_ ~variants:_ ->
+   fun state (module Self) (module Val) (module Tag) ~name ~variants:_ ->
     Reader.skip_whitespace state.reader;
     match Reader.peek state.reader with
     (* NOTE(@ostera): if we find a : then we are dealing with a unit variant
@@ -211,7 +211,7 @@ Serde.De.Make (struct
               (fun _ ->
                 Error.message (Printf.sprintf "unexpected tuple variant"));
             record_variant =
-              (fun _ ->
+              (fun _ _ ~fields:_ ->
                 Error.message (Printf.sprintf "unexpected record variant"));
           }
         in
@@ -240,8 +240,12 @@ Serde.De.Make (struct
                 Reader.skip_whitespace state.reader;
                 Ok tuple);
             record_variant =
-              (fun v ->
-                let* record = Serde.De.deserialize_seq (module Self) v in
+              (fun v field_v ~fields ->
+                let* record =
+                  Serde.De.deserialize_record
+                    (module Self)
+                    v field_v ~name ~fields
+                in
                 Reader.skip_whitespace state.reader;
                 Ok record);
           }
@@ -266,12 +270,11 @@ Serde.De.Make (struct
       name:string ->
       fields:string list ->
       (value, 'error de_error) result =
-   fun state (module Self) (module Val) (module Field) ~name ~fields:_ ->
+   fun state (module Self) (module Val) (module Field) ~name:_ ~fields:_ ->
     Reader.skip_whitespace state.reader;
     match Reader.peek state.reader with
     | Some '(' -> (
         Reader.drop state.reader;
-        let* _ = _read_keyword state (":" ^ name) in
         let seq_access : (value, 'error) Sequence_access.t =
           {
             next_element =
