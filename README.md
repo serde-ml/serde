@@ -7,7 +7,27 @@ The main goals for `serde.ml` are:
 * **Serialization** -- take arbitary data structures from the user and turn them into specific formats with maximum efficiency.
 * **Deserialization** -- read arbitrary data that you parse into data structures of the user's choice with maximum efficiency.
 
-> NOTE: this is super not ready for production yet
+> NOTE: this is _super not ready_ for production yet, but all contributions are welcome <3
+
+```ocaml
+type rank = Captain | Chief_petty_officer [@@deriving serializer, deserializer]
+type t = { name : string; rank : rank } [@@deriving serializer, deserializer]
+
+let obrien = { name = "Miles O'Brien"; rank = Chief_petty_officer }
+let sisko = { name = "Benjamin Sisko"; rank = Captain }
+
+> Serde_json.to_string_pretty (serialize_t) obrien
+Ok "{ \"name\": \"Miles O'Brien\", \"rank\": \"Chief_petty_officer\" }"
+
+> Serde_json.of_string (deserialize_t) "{ \"name\": \"Miles O'Brien\", \"rank\": \"Chief_petty_officer\" }"
+Ok {name = "Miles O'Brien"; rank = Chief_petty_officer}
+
+> Serde_sexpr.to_string_pretty (serialize_t) obrien;;
+Ok "(\"Miles O'Brien\" :Chief_petty_officer)"
+
+> Serde_sexpr.of_string (deserialize_t) "(\"Miles O'Brien\" :Chief_petty_officer)";;
+Ok {name = "Miles O'Brien"; rank = Chief_petty_officer}
+```
 
 ### Usage
 
@@ -67,3 +87,21 @@ json == "{
   }
 }"
 ```
+
+## Contributing
+
+Check the [CONTRIBUTING.md](./CONTRIBUTING.md) for a small guide on how to
+implement new data formats.
+
+## Advanced Use: Custom Serializer/Deserializer
+
+Serde.ml is capable of deriving the right serializer/deserializer for your
+types (and it if doesn't, that's a bug!) but in some cases you want to fit some
+external data format into an existing internal representation without having to
+add an extra layer.
+
+In those cases, you can implement a Serde _Visitor_ and customize absolutely
+everything about it. You can get started by using `serde_derive` and `dune
+describe pp` to expand the derivation. This will give you a solid starting
+point for your data type, where you can see how the generated Visitor drives
+the Deserializer by asking it to deserialize specific datatypes.

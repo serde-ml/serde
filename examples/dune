@@ -1,0 +1,5 @@
+(library
+ (name examples)
+ (preprocess
+  (pps serde_derive))
+ (libraries serde serde_derive serde_json serde_sexpr))
