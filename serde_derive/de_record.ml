@@ -38,14 +38,20 @@ let gen_visit_map ~ctxt ~type_name:_ ?constructor ~field_visitor kvs parts =
     let cases =
       List.map
         (fun (_name, _pat, ctyp, var, field_variant) ->
+          let deser_value =
+            if is_primitive_type ctyp then
+              [%expr
+                [%e de_fun ~ctxt ctyp]
+                  (module De)
+                  [%e visitor_mod ~ctxt ctyp |> Option.get]]
+            else [%expr [%e de_fun ~ctxt ctyp] (module De)]
+          in
+
           let assign_field =
             [%expr
               let* value =
                 Serde.De.Map_access.next_value map_access
-                  ~deser_value:(fun () ->
-                    [%e de_fun ~ctxt ctyp]
-                      (module De)
-                      [%e visitor_mod ~ctxt ctyp])
+                  ~deser_value:(fun () -> [%e deser_value])
               in
               Ok ([%e var] := value)]
           in
@@ -117,11 +123,18 @@ let gen_visit_seq ~ctxt ~type_name ?constructor kvs parts =
           |> Ast.estring ~loc
         in
 
+        let deser_element =
+          if is_primitive_type ctyp then
+            [%expr
+              [%e de_fun ~ctxt ctyp]
+                (module De)
+                [%e visitor_mod ~ctxt ctyp |> Option.get]]
+          else [%expr [%e de_fun ~ctxt ctyp] (module De)]
+        in
+
         let body =
           [%expr
-            let deser_element () =
-              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]
-            in
+            let deser_element () = [%e deser_element] in
             let* r =
               Serde.De.Sequence_access.next_element seq_access ~deser_element
             in

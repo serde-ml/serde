@@ -10,3 +10,5 @@ module type Serializable = sig
 
   val serialize_t : t -> (data, 'error Ser.ser_error) result
 end
+
+let ( let* ) = Result.bind

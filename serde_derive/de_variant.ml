@@ -111,7 +111,9 @@ let gen_deserialize_tuple_variant_impl ~ctxt ~variant_name parts =
         let deser_element =
           if is_primitive_type ctyp then
             [%expr
-              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]]
+              [%e de_fun ~ctxt ctyp]
+                (module De)
+                [%e visitor_mod ~ctxt ctyp |> Option.get]]
           else [%expr [%e de_fun ~ctxt ctyp] (module De)]
         in
 

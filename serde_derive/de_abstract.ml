@@ -32,7 +32,9 @@ let gen_deserialize_abstract_tuple_impl ~ctxt type_name parts =
         let deser_element =
           if is_primitive_type ctyp then
             [%expr
-              [%e de_fun ~ctxt ctyp] (module De) [%e visitor_mod ~ctxt ctyp]]
+              [%e de_fun ~ctxt ctyp]
+                (module De)
+                [%e visitor_mod ~ctxt ctyp |> Option.get]]
           else [%expr [%e de_fun ~ctxt ctyp] (module De)]
         in
 
@@ -136,7 +138,9 @@ let gen_deserialize_abstract_impl ~ctxt type_name (manifest : core_type) =
   | Ptyp_constr (_, []) ->
       let deserialize_body =
         [%expr
-          [%e de_fun ~ctxt manifest] (module De) [%e visitor_mod ~ctxt manifest]]
+          [%e de_fun ~ctxt manifest]
+            (module De)
+            [%e visitor_mod ~ctxt manifest |> Option.get]]
       in
       ([], deserialize_body)
   | Ptyp_constr (_, _)

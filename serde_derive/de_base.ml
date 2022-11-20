@@ -82,20 +82,13 @@ let visitor_mod ~ctxt (t : core_type) =
   (* Serialize a constructor *)
   | Ptyp_constr (name, _) -> (
       match name.txt |> Longident.name with
-      | "bool" -> [%expr (module Serde.De.Impls.Bool_visitor)]
-      | "char" -> [%expr (module Serde.De.Impls.Char_visitor)]
-      | "float" -> [%expr (module Serde.De.Impls.Float_visitor)]
-      | "int" -> [%expr (module Serde.De.Impls.Int_visitor)]
-      | "string" -> [%expr (module Serde.De.Impls.String_visitor)]
-      | "unit" -> [%expr (module Serde.De.Impls.Unit_visitor)]
-      | _ ->
-          let mod_name =
-            (match name.txt |> Longident.flatten_exn |> List.rev with
-            | _ :: path -> path |> List.rev |> String.concat "."
-            | _ -> "unknown")
-            |> longident ~ctxt
-          in
-          Ast.pexp_pack ~loc (Ast.pmod_ident ~loc mod_name))
+      | "bool" -> Some [%expr (module Serde.De.Impls.Bool_visitor)]
+      | "char" -> Some [%expr (module Serde.De.Impls.Char_visitor)]
+      | "float" -> Some [%expr (module Serde.De.Impls.Float_visitor)]
+      | "int" -> Some [%expr (module Serde.De.Impls.Int_visitor)]
+      | "string" -> Some [%expr (module Serde.De.Impls.String_visitor)]
+      | "unit" -> Some [%expr (module Serde.De.Impls.Unit_visitor)]
+      | _ -> None)
   (* Unsupported serialization for these *)
   | Ptyp_tuple _ | Ptyp_any | Ptyp_var _
   | Ptyp_object (_, _)
@@ -105,4 +98,4 @@ let visitor_mod ~ctxt (t : core_type) =
   | Ptyp_poly (_, _)
   | Ptyp_package _ | Ptyp_extension _
   | Ptyp_arrow (_, _, _) ->
-      [%expr ()]
+      None

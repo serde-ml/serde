@@ -54,12 +54,8 @@ include Serde.Ser.Make (struct
   and serialize_record
       (module Ser : Serde.Ser.Mapper
         with type output = output
-         and type error = error) _output ~type_name ~record_size:_ ~fields =
+         and type error = error) _output ~type_name:_ ~record_size:_ ~fields =
     let* fields = Ser.map_field fields in
-    let fields =
-      fields
-      |> List.map (fun (name, sexpr) ->
-             S.List [ S.Atom ":name"; S.Atom name; S.Atom ":value"; sexpr ])
-    in
-    Ok (S.List [ S.Atom type_name; S.List fields ])
+    let fields = fields |> List.map (fun (_name, sexpr) -> sexpr) in
+    Ok (S.List fields)
 end)
