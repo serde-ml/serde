@@ -1,15 +1,16 @@
 include Error
-
 module Deserializer = Deserializer
-(** API *)
-
 module Error = Error
 module Impls = Impls
 module Reader = Reader
-module Sequence_access = Sequence_access
 module Unimplemented = Unimplemented
-module Variant_access = Variant_access
 module Visitor = Visitor
+
+module Sequence_access = Sequence_access
+(** Access modules *)
+
+module Variant_access = Variant_access
+module Map_access = Map_access
 
 module type Base = Intf.Deserializer_base_intf
 module type Deserializer = Intf.Deserializer_intf

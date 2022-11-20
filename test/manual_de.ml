@@ -2,39 +2,48 @@ open Serde
 
 let ( let* ) = Result.bind
 
-let parse eq fn s t =
-  match Serde_sexpr.of_string fn s |> Result.map_error (fun x -> `De x) with
-  | Ok t' -> eq t t'
-  | Error (`De (`Unimplemented msg)) ->
+let print_err err =
+  match err with
+  | `De (`Unimplemented msg) ->
       print_string ("unimplemented: " ^ msg);
       false
-  | Error (`De (`Invalid_field_index _)) ->
+  | `De (`Invalid_field_index _) ->
       print_string "invalid_field_idx";
       false
-  | Error (`De (`Unknown_field s)) ->
+  | `De (`Unknown_field s) ->
       print_string ("Unknown_field: " ^ s);
       false
-  | Error (`De (`Invalid_variant_index _)) ->
-      print_string "invalid_variant_idx";
+  | `De (`Invalid_variant_index _) ->
+      print_string "invalid_va_idx";
       false
-  | Error (`De (`Unknown_variant s)) ->
+  | `De (`Unknown_variant s) ->
       print_string ("Unknown_variant: " ^ s);
       false
-  | Error (`De (`Duplicate_field _)) ->
+  | `De (`Duplicate_field _) ->
       print_string "Duplicate_field";
       false
-  | Error (`De (`Missing_field _)) ->
+  | `De (`Missing_field _) ->
       print_string "Missing_field";
       false
-  | Error (`De (`Message msg)) ->
+  | `De (`Message msg) ->
       print_string ("msg: " ^ msg);
       false
-  | Error (`De (`Unexpected_exception exn)) ->
+  | `De (`Unexpected_exception exn) ->
       print_string ("exn: " ^ Printexc.to_string exn);
       false
-  | Error (`Ser _) ->
+  | `Ser _ ->
       print_string "error serializing";
       false
+
+let parse_json eq fn s t =
+  match Serde_json.of_string fn s |> Result.map_error (fun x -> `De x) with
+  | Ok t' -> eq t t'
+  | Error err -> print_err err
+
+let parse_sexpr eq fn s t =
+  match Serde_sexpr.of_string fn s |> Result.map_error (fun x -> `De x) with
+  | Ok t' -> eq t t'
+  | Error err -> print_err err
 
 module Type_alias = struct
   type alias = int [@@deriving eq]
@@ -51,9 +60,9 @@ module Type_alias = struct
 
   include Serde_deserialize_alias
 
-  let parse = parse Int.equal deserialize_alias
+  let parse_sexpr = parse_sexpr Int.equal deserialize_alias
 
-  let%test _ = parse "1" 1
+  let%test _ = parse_sexpr "1" 1
 end
 
 module Type_record = struct
@@ -62,7 +71,7 @@ module Type_record = struct
     r_favorite_number : int;
     r_location : string;
   }
-  [@@deriving eq, serializer, deserializer]
+  [@@deriving eq]
 
   module Serde_deserialize_record = struct
     let name = "record"
@@ -70,7 +79,7 @@ module Type_record = struct
 
     type fields = Field_r_name | Field_r_favorite_number | Field_r_location
 
-    module Tag_visitor_for_record = Serde.De.Visitor.Make (struct
+    module Field_visitor_for_record = Serde.De.Visitor.Make (struct
       include Serde.De.Visitor.Unimplemented
 
       type value = fields
@@ -93,18 +102,91 @@ module Type_record = struct
       let _ = visit_string
     end)
 
-    module Visitor_for_record : Serde.De.Visitor.Intf with type value = record =
+    module Visitor_for_record :
+      Serde.De.Visitor.Intf with type value = record and type tag = fields =
     Serde.De.Visitor.Make (struct
       open Serde.De
       include Visitor.Unimplemented
 
       type value = record
-      type tag = unit
+      type tag = fields
+
+      let visit_map :
+          type de_state.
+          value Visitor.t ->
+          de_state Deserializer.t ->
+          (value, 'error) Map_access.t ->
+          (value, 'error Error.de_error) result =
+       fun (module Self) (module De) map_access ->
+        let f0 = ref None in
+        let f1 = ref None in
+        let f2 = ref None in
+
+        let rec fill () =
+          let* key =
+            Map_access.next_key map_access ~deser_key:(fun () ->
+                Serde.De.deserialize_string
+                  (module De)
+                  (module Field_visitor_for_record))
+          in
+          match key with
+          | None -> Ok ()
+          | Some f ->
+              let* () =
+                match f with
+                | Field_r_name ->
+                    let* value =
+                      Map_access.next_value map_access ~deser_value:(fun () ->
+                          Serde.De.deserialize_string
+                            (module De)
+                            (module Serde.De.Impls.String_visitor))
+                    in
+                    Ok (f0 := value)
+                | Field_r_favorite_number ->
+                    let* value =
+                      Map_access.next_value map_access ~deser_value:(fun () ->
+                          Serde.De.deserialize_int
+                            (module De)
+                            (module Serde.De.Impls.Int_visitor))
+                    in
+                    Ok (f1 := value)
+                | Field_r_location ->
+                    let* value =
+                      Map_access.next_value map_access ~deser_value:(fun () ->
+                          Serde.De.deserialize_string
+                            (module De)
+                            (module Serde.De.Impls.String_visitor))
+                    in
+                    Ok (f2 := value)
+              in
+              fill ()
+        in
+        let* () = fill () in
+
+        let* f0 =
+          match !f0 with
+          | Some f0 -> Ok f0
+          | None -> Error.missing_field "r_name"
+        in
+
+        let* f1 =
+          match !f1 with
+          | Some f1 -> Ok f1
+          | None -> Error.missing_field "r_favorite_number"
+        in
+
+        let* f2 =
+          match !f2 with
+          | Some f2 -> Ok f2
+          | None -> Error.missing_field "r_location"
+        in
+
+        Ok { r_name = f0; r_favorite_number = f1; r_location = f2 }
 
       let visit_seq :
           type de_state.
-          (module Visitor.Intf with type value = value) ->
-          (module Deserializer with type state = de_state) ->
+          value Visitor.t ->
+          de_state Deserializer.t ->
           (value, 'error) Sequence_access.t ->
           (value, 'error Error.de_error) result =
        fun (module Self) (module De) seq_access ->
@@ -141,15 +223,52 @@ module Type_record = struct
 
         Ok { r_name = f0; r_favorite_number = f1; r_location = f2 }
     end)
+
+    let deserialize_record :
+        type de_state.
+        de_state Serde.De.Deserializer.t ->
+        (record, 'error Serde.De.de_error) result =
+     fun de ->
+      Serde.De.deserialize_record de
+        (module Visitor_for_record)
+        (module Field_visitor_for_record)
+        ~name ~fields
   end
 
   include Serde_deserialize_record
 
-  let parse = parse equal_record deserialize_record
+  let parse_sexpr = parse_sexpr equal_record deserialize_record
+  let parse_json = parse_json equal_record deserialize_record
 
   let%test _ =
-    parse {|(:record "Benjamin Sisko" 9 "Bajor")|}
+    parse_sexpr {|(:record "Benjamin Sisko" 9 "Bajor")|}
       { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
+
+  let%test "parse_sexpr packed json representation" =
+    parse_json
+      {|
+  [
+    "Benjamin Sisko",
+    9,
+    "Bajor",
+  ]
+  |}
+      { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
+
+  let%test "parse_sexpr object json representation" =
+    parse_json
+      {|
+  {
+    "r_name": "Chief Miles O'Brien",
+    "r_favorite_number": 7,
+    "r_location": "Jeffries Tubes",
+  }
+  |}
+      {
+        r_name = "Chief Miles O'Brien";
+        r_favorite_number = 7;
+        r_location = "Jeffries Tubes";
+      }
 end
 
 module Type_tuple = struct
@@ -206,9 +325,9 @@ module Type_tuple = struct
 
   include Serde_deserialize_tuple
 
-  let parse = parse equal_tuple deserialize_tuple
+  let parse_sexpr = parse_sexpr equal_tuple deserialize_tuple
 
-  let%test _ = parse "(21 12)" (21, 12)
+  let%test _ = parse_sexpr "(21 12)" (21, 12)
 end
 
 module Type_variant = struct

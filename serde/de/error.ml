@@ -5,6 +5,7 @@ type 'err de_error =
   | `Message of string
   | `Missing_field of string
   | `Unexpected_exception of exn
+  | `Missing_field of string
   | `Unimplemented of string
   | `Unknown_field of string
   | `Unknown_variant of string ]
@@ -18,3 +19,4 @@ let unexpected_exception exn = Error (`Unexpected_exception exn)
 let unimplemented str = Error (`Unimplemented str)
 let unknown_field str = Error (`Unknown_field str)
 let unknown_variant str = Error (`Unknown_variant str)
+let missing_field field = Error (`Missing_field field)

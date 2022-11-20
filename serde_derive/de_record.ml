@@ -3,21 +3,89 @@ module Ast = Ast_builder.Default
 open De_base
 
 (** implementation *)
-let gen_visitor ~ctxt type_name (label_declarations : label_declaration list) =
+let gen_visit_map ~ctxt ~type_name:_ ~field_visitor kvs parts =
   let loc = loc ~ctxt in
-  let visitor_module_name = "Visitor_for_" ^ type_name.txt in
 
-  let make_vars_and_pats i ldecl =
-    let f_idx = "f_" ^ Int.to_string i in
-    let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
-    let var = f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
-    let kv = (longident ~ctxt ldecl.pld_name.txt, var) in
-    (kv, (pat, ldecl.pld_type))
+  let create_value =
+    let value = Ast.pexp_record ~loc kvs None in
+    [%expr Ok [%e value]]
   in
 
-  let kvs, parts =
-    label_declarations |> List.mapi make_vars_and_pats |> List.split
+  let extract_fields =
+    List.fold_left
+      (fun body (name, pat, _ctyp, exp, _field_variant) ->
+        let op = var ~ctxt "let*" in
+        let exp =
+          [%expr
+            match ![%e exp] with
+            | Some value -> Ok value
+            | None -> Serde.De.Error.missing_field [%e name |> Ast.estring ~loc]]
+        in
+        let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
+        Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
+      create_value (List.rev parts)
   in
+
+  let fill_individual_field =
+    let cases =
+      List.map
+        (fun (_name, _pat, ctyp, var, field_variant) ->
+          let assign_field =
+            [%expr
+              let* value =
+                Serde.De.Map_access.next_value map_access
+                  ~deser_value:(fun () ->
+                    [%e de_fun ~ctxt ctyp]
+                      (module De)
+                      [%e visitor_mod ~ctxt ctyp])
+              in
+              Ok ([%e var] := value)]
+          in
+          let constructor =
+            Ast.ppat_construct ~loc (longident ~ctxt field_variant) None
+          in
+          Ast.case ~lhs:[%pat? [%p constructor]] ~guard:None ~rhs:assign_field)
+        parts
+    in
+    let match_ = Ast.pexp_match ~loc [%expr f] cases in
+    [%expr
+      let* () = [%e match_] in
+      fill ()]
+  in
+
+  let fill_fields =
+    [%expr
+      let deser_key () =
+        Serde.De.deserialize_identifier (module De) [%e field_visitor]
+      in
+      let rec fill () =
+        let* key = Serde.De.Map_access.next_key map_access ~deser_key in
+        match key with None -> Ok () | Some f -> [%e fill_individual_field]
+      in
+      let* () = fill () in
+      [%e extract_fields]]
+  in
+
+  let initialize_fields =
+    List.fold_left
+      (fun body (_name, pat, _type, _var, _field_variant) ->
+        let expr = [%expr ref None] in
+        let vb = Ast.value_binding ~loc ~pat ~expr in
+        Ast.pexp_let ~loc Nonrecursive [ vb ] body)
+      fill_fields (List.rev parts)
+  in
+
+  [%stri
+    let visit_map :
+        type de_state.
+        value Serde.De.Visitor.t ->
+        de_state Serde.De.Deserializer.t ->
+        (value, 'error) Serde.De.Map_access.t ->
+        (value, 'error Serde.De.Error.de_error) result =
+     fun (module Self) (module De) map_access -> [%e initialize_fields]]
+
+let gen_visit_seq ~ctxt ~type_name kvs parts =
+  let loc = loc ~ctxt in
 
   let create_value =
     let value = Ast.pexp_record ~loc kvs None in
@@ -26,7 +94,7 @@ let gen_visitor ~ctxt type_name (label_declarations : label_declaration list) =
 
   let exprs =
     List.map
-      (fun (pat, ctyp) ->
+      (fun (_field_name, pat, ctyp, _expr, _field_variant) ->
         let err_msg =
           Printf.sprintf "%s needs %d argument" type_name.txt
             (List.length parts)
@@ -59,6 +127,32 @@ let gen_visitor ~ctxt type_name (label_declarations : label_declaration list) =
       create_value (List.rev exprs)
   in
 
+  [%stri
+    let visit_seq :
+        type de_state.
+        (module Serde.De.Visitor.Intf with type value = value) ->
+        (module Serde.De.Deserializer with type state = de_state) ->
+        (value, 'error) Serde.De.Sequence_access.t ->
+        (value, 'error Serde.De.Error.de_error) result =
+     fun (module Self) (module De) seq_access -> [%e visit_seq]]
+
+let gen_visitor ~ctxt ~type_name ~field_visitor
+    (label_declarations : (label_declaration * string) list) =
+  let loc = loc ~ctxt in
+  let visitor_module_name = "Visitor_for_" ^ type_name.txt in
+
+  let make_vars_and_pats i (ldecl, field_variant) =
+    let record_field_name = ldecl.pld_name.txt in
+    let f_idx = "f_" ^ Int.to_string i in
+    let pat = f_idx |> var ~ctxt |> Ast.ppat_var ~loc in
+    let var = f_idx |> Longident.parse |> var ~ctxt |> Ast.pexp_ident ~loc in
+    let kv = (longident ~ctxt record_field_name, var) in
+    (kv, (record_field_name, pat, ldecl.pld_type, var, field_variant))
+  in
+
+  let labels = label_declarations |> List.mapi make_vars_and_pats in
+  let kvs, parts = labels |> List.split in
+
   let visitor_module =
     [%str
       include Serde.De.Visitor.Unimplemented
@@ -66,14 +160,8 @@ let gen_visitor ~ctxt type_name (label_declarations : label_declaration list) =
       type value = [%t Ast.ptyp_constr ~loc (longident ~ctxt type_name.txt) []]
       type tag = fields]
     @ [
-        [%stri
-          let visit_seq :
-              type de_state.
-              (module Serde.De.Visitor.Intf with type value = value) ->
-              (module Serde.De.Deserializer with type state = de_state) ->
-              (value, 'error) Serde.De.Sequence_access.t ->
-              (value, 'error Serde.De.Error.de_error) result =
-           fun (module Self) (module De) seq_access -> [%e visit_seq]];
+        gen_visit_seq ~ctxt ~type_name kvs parts;
+        gen_visit_map ~ctxt ~type_name ~field_visitor kvs parts;
       ]
   in
 
@@ -94,7 +182,7 @@ let gen_visitor ~ctxt type_name (label_declarations : label_declaration list) =
 
   (ident, visitor_module)
 
-let gen_field_visitor ~ctxt type_name constructors =
+let gen_field_visitor ~ctxt ~type_name constructors =
   let loc = loc ~ctxt in
 
   let field_visitor_module_name = "Field_visitor_for_" ^ type_name.txt in
@@ -226,11 +314,12 @@ let gen_deserialize_record_impl ~ctxt type_name
   in
 
   let field_visitor_for_t_name, field_visitor_for_t =
-    gen_field_visitor ~ctxt type_name field_constructors
+    gen_field_visitor ~ctxt ~type_name field_constructors
   in
 
   let visitor_for_t_name, visitor_for_t =
-    gen_visitor ~ctxt type_name label_declarations
+    gen_visitor ~ctxt ~type_name ~field_visitor:field_visitor_for_t_name
+      field_constructors
   in
 
   let str_items = constants @ [ field_visitor_for_t; visitor_for_t ] in

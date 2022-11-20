@@ -26,7 +26,7 @@ module Unimplemented = struct
 
   let visit_seq :
         'state.
-        'state t ->
+        'value t ->
         'state' Deserializer.t ->
         ('value, 'error) Sequence_access.t ->
         ('value, 'error Error.de_error) result =
@@ -39,10 +39,11 @@ module Unimplemented = struct
 
   let visit_map :
         'state.
+        'value t ->
         'state Deserializer.t ->
-        ('state, 'error) Map_access.t ->
+        ('value, 'error) Map_access.t ->
         ('value, 'error Error.de_error) result =
-   fun _ _ -> Error.unimplemented "visit_map"
+   fun _ _ _ -> Error.unimplemented "visit_map"
 end
 
 module Make (B : Intf) = struct

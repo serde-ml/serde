@@ -7,6 +7,17 @@ Serde.De.Make (struct
 
   type state = Json.Parser.t
 
+  let deserialize_identifier :
+      type value.
+      state ->
+      (module Deserializer with type state = state) ->
+      (module Visitor.Intf with type value = value) ->
+      (value, 'error de_error) result =
+   fun state (module Self) (module V) ->
+    Json.Parser.skip_space state;
+    let* id = Json.Parser.read_string state in
+    V.visit_string id
+
   let deserialize_bool :
       type value.
       state ->
@@ -21,19 +32,30 @@ Serde.De.Make (struct
   let deserialize_int :
       type value.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value) ->
+      state Deserializer.t ->
+      value Visitor.t ->
       (value, 'error de_error) result =
    fun state (module Self) (module V) ->
     Json.Parser.skip_space state;
     let* int = Json.Parser.read_int state in
     V.visit_int int
 
+  let deserialize_string :
+      type value.
+      state ->
+      state Deserializer.t ->
+      value Visitor.t ->
+      (value, 'error de_error) result =
+   fun state (module Self) (module V) ->
+    Json.Parser.skip_space state;
+    let* string = Json.Parser.read_string state in
+    V.visit_string string
+
   let deserialize_seq :
       type value.
       state ->
-      (module Deserializer with type state = state) ->
-      (module Visitor.Intf with type value = value) ->
+      state Deserializer.t ->
+      value Visitor.t ->
       (value, 'error de_error) result =
    fun state (module Self) (module V) ->
     Json.Parser.skip_space state;
@@ -56,9 +78,83 @@ Serde.De.Make (struct
     in
     let* value = V.visit_seq (module V) (module Self) seq_access in
     Json.Parser.skip_space state;
+    let* () =
+      match Json.Parser.peek state with
+      | Some ',' -> Json.Parser.read_comma state
+      | _ -> Ok ()
+    in
+    Json.Parser.skip_space state;
     match Json.Parser.read_close_bracket state with
     | Ok () -> Ok value
     | _ -> Error.message "expected closed bracket to close a sequence"
+
+  let deserialize_record :
+      type value field.
+      state ->
+      state Deserializer.t ->
+      (value, field) Visitor.with_tag ->
+      field Visitor.t ->
+      name:string ->
+      fields:string list ->
+      (value, 'error de_error) result =
+   fun state (module Self) (module Val) (module Field) ~name:_ ~fields:_ ->
+    Json.Parser.skip_space state;
+    match Json.Parser.peek state with
+    | Some '[' -> Serde.De.deserialize_seq (module Self) (module Val)
+    | Some '{' -> (
+        let* () = Json.Parser.read_object_start state in
+        let first_field = ref true in
+        let map_access : (value, 'error) Map_access.t =
+          {
+            next_key =
+              (fun ~deser_key ->
+                Json.Parser.skip_space state;
+                let* () =
+                  if !first_field then (
+                    first_field := false;
+                    Ok ())
+                  else
+                    let* () =
+                      match Json.Parser.peek state with
+                      | Some ',' -> Json.Parser.read_comma state
+                      | _ -> Ok ()
+                    in
+                    Json.Parser.skip_space state;
+                    Ok ()
+                in
+
+                match Json.Parser.peek state with
+                | None | Some '}' -> Ok None
+                | _ ->
+                    let* key = deser_key () in
+                    Ok (Some key));
+            next_value =
+              (fun ~deser_value ->
+                Json.Parser.skip_space state;
+                let* () = Json.Parser.read_colon state in
+                let* value = deser_value () in
+                Ok (Some value));
+          }
+        in
+        let* value = Val.visit_map (module Val) (module Self) map_access in
+        Json.Parser.skip_space state;
+        let* () =
+          match Json.Parser.peek state with
+          | Some ',' -> Json.Parser.read_comma state
+          | _ -> Ok ()
+        in
+        Json.Parser.skip_space state;
+        match Json.Parser.peek state with
+        | Some '}' -> Ok value
+        | _ -> Error.message "expected closed bracket to close a sequence")
+    | Some c ->
+        Error.message
+          (Printf.sprintf
+             "expected record to be serialized as an object (beginning with \
+              '{') or as an array (beginning with '['), instead found \
+              character %c"
+             c)
+    | None -> Error.message "unexpected end of stream!"
 end)
 
 let of_string ~string =

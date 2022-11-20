@@ -89,9 +89,24 @@ module Type_record = struct
   [@@deriving eq, serializer, deserializer]
 
   let parse_sexpr = parse_sexpr equal_record deserialize_record
+  let parse_json = parse_json equal_record deserialize_record
 
   let%test _ =
     parse_sexpr {|(:record "Benjamin Sisko" 9 "Bajor")|}
+      { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
+
+  let%test "parse packed json representation" =
+    parse_json {| [ "Benjamin Sisko", 9, "Bajor", ] |}
+      { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
+
+  let%test "parse object json representation" =
+    parse_json
+      {|
+  { "r_name": "Benjamin Sisko",
+    "r_favorite_number": 9,
+    "r_location": "Bajor"
+  }
+  |}
       { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
 end
 
@@ -104,6 +119,7 @@ module Type_variant = struct
   [@@deriving eq, serializer, deserializer]
 
   let parse_sexpr = parse_sexpr equal_variant deserialize_variant
+  let parse_json = parse_json equal_variant deserialize_variant
 
   let%test _ = parse_sexpr ":Hello" Hello
 
