@@ -71,7 +71,6 @@ module Type_alias = struct
   include Serde_deserialize_alias
 
   let parse_sexpr = parse_sexpr Int.equal deserialize_alias
-
   let%test _ = parse_sexpr "1" 1
 end
 
@@ -336,7 +335,6 @@ module Type_tuple = struct
   include Serde_deserialize_tuple
 
   let parse_sexpr = parse_sexpr equal_tuple deserialize_tuple
-
   let%test _ = parse_sexpr "(21 12)" (21, 12)
 end
 

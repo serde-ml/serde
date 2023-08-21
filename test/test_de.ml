@@ -44,7 +44,6 @@ module Type_alias = struct
   type alias = int [@@deriving eq, serializer, deserializer]
 
   let parse_json = parse_json Int.equal deserialize_alias
-
   let%test _ = parse_json "     1  " 1
   let%test _ = parse_json "-1012" (-1012)
 end
@@ -104,7 +103,6 @@ module Type_variant = struct
   [@@deriving eq, serializer, deserializer]
 
   let parse_json = parse_json equal_variant deserialize_variant
-
   let%test _ = parse_json {|"Hello"|} Hello
 
   let%test _ =

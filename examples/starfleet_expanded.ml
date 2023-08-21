@@ -37,7 +37,7 @@ module Starfleet_staff = struct
       | Chief_petty_officer ->
           Ser.serialize_unit_variant ~typename:"rank" ~variant_idx:2
             ~variant_name:"Chief_petty_officer"
-      [@@ocaml.doc " Serialize a value of this type into Serde.data "]
+    [@@ocaml.doc " Serialize a value of this type into Serde.data "]
 
     let _ = serialize_rank
 
@@ -141,7 +141,7 @@ module Starfleet_staff = struct
       let* f_1 = serialize_rank f_1 in
       let fields = [ ("name", f_0); ("rank", f_1) ] in
       Ser.serialize_record ~typename:"t" ~size:2 ~fields
-      [@@ocaml.doc " Serialize a value of this type into Serde.data "]
+    [@@ocaml.doc " Serialize a value of this type into Serde.data "]
 
     let _ = serialize_t
 
