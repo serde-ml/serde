@@ -60,7 +60,7 @@ To read data, use `deserialize_t` like this:
 ```ocaml
 let sexpr = "(:Record3 (\"Benjamin Sisko\" 9 \"Bajor\"))" in
 let* t = Serde_sexpr.of_string deserialize_t sexpr in
-t == (Record3 { name = "Benjamin Sisko"; favorite_number = 9; location = "Bajor" })
+t = (Record3 { name = "Benjamin Sisko"; favorite_number = 9; location = "Bajor" })
 ```
 
 To render data, use `serialize_t` like this:
@@ -68,7 +68,7 @@ To render data, use `serialize_t` like this:
 ```ocaml
 let t = (Record3 { name = "Benjamin Sisko"; favorite_number = 9; location = "Bajor" }) in
 let* sexpr = Serde_sexpr.to_string_pretty serialize_t t in
-sexpr == "(:Record3 (\"Benjamin Sisko\" 9 \"Bajor\"))"
+sexpr = "(:Record3 (\"Benjamin Sisko\" 9 \"Bajor\"))"
 ```
 
 To transcode data across formats, switch the data module:
@@ -79,7 +79,7 @@ let sexpr = "(:Record3 (\"Benjamin Sisko\" 9 \"Bajor\"))" in
 let* t = Serde_sexpr.of_string deserialize_t sexpr in
 (* write json *)
 let* json = Serde_json.to_string_pretty serialize_t t in
-json == "{
+json = "{
   \"t#Record3\": {
     \"name\": \"Benjamin Sisko\",
     \"favorite_number\": 9,
