@@ -9,8 +9,8 @@ license: "MIT"
 homepage: "https://github.com/leostera/serde.ml"
 bug-reports: "https://github.com/leostera/serde.ml/issues"
 depends: [
+  "dune" {>= "3.5"}
   "ocaml" {>= "4.12.0"}
-  "dune" {>= "3.5" & >= "3.5"}
   "ocamlformat" {>= "0.17.0"}
   "ppx_inline_test" {>= "0.16.0"}
   "odoc" {with-doc}
