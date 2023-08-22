@@ -8,7 +8,7 @@ homepage: "https://github.com/leostera/serde.ml"
 bug-reports: "https://github.com/leostera/serde.ml/issues"
 depends: [
   "dune" {>= "3.5"}
-  "ocaml" {>= "4.12.0"}
+  "ocaml" {>= "4.14.0"}
   "serde" {= version}
   "serde_derive" {= version}
   "tyxml" {>= "4.5.0"}
