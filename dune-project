@@ -20,6 +20,7 @@
  (depends
    (ocaml (>= "4.14.0"))
    (ppx_inline_test (>= "v0.16.0"))
+   (bechamel (and :with-test (>= "0.4.0")))
    ))
 
 (package

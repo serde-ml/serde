@@ -5,6 +5,7 @@ A serialization framework for OCaml inspired by [serde-rs](https://github.com/se
 The main goals for `serde.ml` are:
 
 * **Serialization** -- take arbitary data structures from the user and turn them into specific formats with maximum efficiency.
+
 * **Deserialization** -- read arbitrary data that you parse into data structures of the user's choice with maximum efficiency.
 
 > NOTE: this is _super not ready_ for production yet, but all contributions are welcome <3
