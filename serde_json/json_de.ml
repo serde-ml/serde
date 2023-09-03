@@ -144,8 +144,8 @@ Serde.De.Make (struct
           | _ -> Ok ()
         in
         Json.Parser.skip_space state;
-        match Json.Parser.peek state with
-        | Some '}' -> Ok value
+        match Json.Parser.read_object_end state with
+        | Ok () -> Ok value
         | _ -> Error.message "expected closed bracket to close a sequence")
     | Some c ->
         Error.message

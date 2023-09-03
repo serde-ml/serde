@@ -52,7 +52,8 @@ module Parser = struct
     _run (fun () -> Yojson.Safe.read_object_sep yojson lexbuf)
 
   let read_object_end { lexbuf; _ } =
-    _run (fun () -> Yojson.Safe.read_object_end lexbuf)
+    _run (fun () ->
+        try Yojson.Safe.read_object_end lexbuf with Yojson.End_of_object -> ())
 
   let read_open_bracket { yojson; lexbuf } =
     _run (fun () -> Yojson.Safe.read_lbr yojson lexbuf)

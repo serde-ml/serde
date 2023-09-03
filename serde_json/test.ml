@@ -95,11 +95,14 @@ module Type_record = struct
 end
 
 module Type_variant = struct
+  type name = { first : string; last : string }
+  [@@deriving eq, serializer, deserializer]
+
   type variant =
     | Hello
     | Tuple1 of string
     | Tuple2 of string * Type_alias.alias
-    | Record3 of { name : string; favorite_number : int; location : string }
+    | Record3 of { name : name; favorite_number : int; location : string }
   [@@deriving eq, serializer, deserializer]
 
   let parse_json = parse_json equal_variant deserialize_variant
@@ -113,21 +116,32 @@ module Type_variant = struct
       (Tuple2 ("this is a tuple", 1))
 
   let%test _ =
-    parse_json {|{ "Record3": ["Benjamin Sisko", 9, "Bajor"] }|}
+    parse_json {|{ "Record3": [ ["Benjamin", "Sisko"], 9, "Bajor"] }|}
       (Record3
-         { name = "Benjamin Sisko"; favorite_number = 9; location = "Bajor" })
+         {
+           name = { first = "Benjamin"; last = "Sisko" };
+           favorite_number = 9;
+           location = "Bajor";
+         })
 
   let%test _ =
     parse_json
       {|{
     "Record3": {
-      "name": "Benjamin Sisko",
+      "name": {
+        "first": "Benjamin",
+        "last": "Sisko",
+      },
       "favorite_number": 9,
       "location": "Bajor"
     }
   }|}
       (Record3
-         { name = "Benjamin Sisko"; favorite_number = 9; location = "Bajor" })
+         {
+           name = { first = "Benjamin"; last = "Sisko" };
+           favorite_number = 9;
+           location = "Bajor";
+         })
 end
 
 (*
