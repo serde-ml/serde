@@ -51,6 +51,22 @@ Serde.De.Make (struct
     let* string = Json.Parser.read_string state in
     V.visit_string string
 
+  let deserialize_null :
+      type value.
+      state ->
+      state Deserializer.t ->
+      value Visitor.t ->
+      (value option, 'error de_error) result =
+   fun state (module Self) (module V) ->
+    Json.Parser.skip_space state;
+    if
+      not
+        (match Json.Parser.read_null_if_possible state with
+        | Ok b -> b
+        | Error _ -> false)
+    then Error.message "not null"
+    else Ok None
+
   let deserialize_seq :
       type value.
       state ->

@@ -94,6 +94,130 @@ module Type_record = struct
       { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
 end
 
+module Type_record_optional = struct
+  type record = {
+    r_name : string;
+    r_favorite_number : int;
+    r_location : string option;
+  }
+  [@@deriving eq, deserializer]
+
+  let parse_json = parse_json equal_record deserialize_record
+
+  let%test "parse packed json representation" =
+    parse_json {| [ "Benjamin Sisko", 9, "Bajor", ] |}
+      {
+        r_name = "Benjamin Sisko";
+        r_favorite_number = 9;
+        r_location = Some "Bajor";
+      }
+
+  let%test "parse object json representation" =
+    parse_json
+      {|
+  { "r_name": "Benjamin Sisko",
+    "r_favorite_number": 9,
+    "r_location": "Bajor"
+  }
+  |}
+      {
+        r_name = "Benjamin Sisko";
+        r_favorite_number = 9;
+        r_location = Some "Bajor";
+      }
+
+  let%test "parse object json representation missing value" =
+    parse_json
+      {|
+  { "r_name": "Benjamin Sisko",
+    "r_favorite_number": 9
+  }
+  |}
+      { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = None }
+
+  let%test "parse object json representation explicit null" =
+    parse_json
+      {|
+  { "r_name": "Benjamin Sisko",
+    "r_favorite_number": 9,
+    "r_location": null
+  }
+  |}
+      { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = None }
+end
+
+module Type_record_complex_optional = struct
+  type name = { r_first : string; r_last : string }
+  [@@deriving eq, deserializer]
+
+  type record = {
+    r_name : name;
+    r_favorite_number : int;
+    r_location : string option;
+  }
+  [@@deriving eq, deserializer]
+
+  let parse_json = parse_json equal_record deserialize_record
+
+  let%test "parse packed json representation" =
+    parse_json {| [ [ "Benjamin", "Sisko" ], 9, "Bajor", ] |}
+      {
+        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
+        r_favorite_number = 9;
+        r_location = Some "Bajor";
+      }
+
+  let%test "parse object json representation" =
+    parse_json
+      {|
+  { "r_name": {
+      "r_first": "Benjamin",
+      "r_last": "Sisko"
+    },
+    "r_favorite_number": 9,
+    "r_location": "Bajor"
+  }
+  |}
+      {
+        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
+        r_favorite_number = 9;
+        r_location = Some "Bajor";
+      }
+
+  let%test "parse object json representation missing value" =
+    parse_json
+      {|
+  { "r_name": {
+      "r_first": "Benjamin",
+      "r_last": "Sisko"
+    },
+    "r_favorite_number": 9
+  }
+  |}
+      {
+        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
+        r_favorite_number = 9;
+        r_location = None;
+      }
+
+  let%test "parse object json representation explicit null" =
+    parse_json
+      {|
+  { "r_name": {
+      "r_first": "Benjamin",
+      "r_last": "Sisko"
+    },
+    "r_favorite_number": 9,
+    "r_location": null
+  }
+  |}
+      {
+        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
+        r_favorite_number = 9;
+        r_location = None;
+      }
+end
+
 module Type_variant = struct
   type name = { first : string; last : string }
   [@@deriving eq, serializer, deserializer]
