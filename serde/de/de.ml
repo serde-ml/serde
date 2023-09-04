@@ -105,28 +105,6 @@ let deserialize_identifier :
   | exception e -> Error.unexpected_exception e
   | res -> res
 
-let deserialize_option_record :
-    type value field state.
-    (state Deserializer.t ->
-    (value, field) Visitor.with_tag ->
-    field Visitor.t ->
-    name:string ->
-    fields:string list ->
-    (value, 'error de_error) result) ->
-    state Deserializer.t ->
-    (value, field) Visitor.with_tag ->
-    field Visitor.t ->
-    name:string ->
-    fields:string list ->
-    (value option, 'error de_error) result =
- fun fn (module De) (module V) (module Field) ~name ~fields ->
-  match De.deserialize_null De.state (module De) with
-  | Ok _ -> Ok None
-  | _ -> (
-      match fn (module De) (module V) (module Field) ~name ~fields with
-      | Ok x -> Ok (Some x)
-      | Error _ as err -> err)
-
 let deserialize_record :
     type value field state.
     state Deserializer.t ->
