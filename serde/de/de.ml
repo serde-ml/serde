@@ -91,11 +91,11 @@ let deserialize_record_option :
     ('a, 'error de_error) result) ->
     (module Deserializer with type state = state) ->
     ('a option, 'error de_error) result =
- fun fn (module Self) ->
-  match Self.deserialize_null Self.state (module Self) with
+ fun fn (module De) ->
+  match De.deserialize_null De.state (module De) with
   | Ok _ -> Ok None
   | _ -> (
-      match fn (module Self) with Ok x -> Ok (Some x) | Error _ as err -> err)
+      match fn (module De) with Ok x -> Ok (Some x) | Error _ as err -> err)
 
 let deserialize_identifier :
     type value state.
