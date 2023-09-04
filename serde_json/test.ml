@@ -151,7 +151,7 @@ module Type_record_complex_optional = struct
   [@@deriving eq, deserializer]
 
   type record = {
-    r_name : name;
+    r_name : name option;
     r_favorite_number : int;
     r_location : string option;
   }
@@ -162,7 +162,7 @@ module Type_record_complex_optional = struct
   let%test "parse packed json representation" =
     parse_json {| [ [ "Benjamin", "Sisko" ], 9, "Bajor", ] |}
       {
-        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
+        r_name = Some { r_first = "Benjamin"; r_last = "Sisko" };
         r_favorite_number = 9;
         r_location = Some "Bajor";
       }
@@ -179,43 +179,27 @@ module Type_record_complex_optional = struct
   }
   |}
       {
-        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
+        r_name = Some { r_first = "Benjamin"; r_last = "Sisko" };
         r_favorite_number = 9;
         r_location = Some "Bajor";
       }
 
-  let%test "parse object json representation missing value" =
-    parse_json
-      {|
-  { "r_name": {
-      "r_first": "Benjamin",
-      "r_last": "Sisko"
-    },
-    "r_favorite_number": 9
+  let%test "parse object json representation missing values" =
+    parse_json {|
+  { "r_favorite_number": 9
   }
   |}
-      {
-        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
-        r_favorite_number = 9;
-        r_location = None;
-      }
+      { r_name = None; r_favorite_number = 9; r_location = None }
 
-  let%test "parse object json representation explicit null" =
+  let%test "parse object json representation explicit nulls" =
     parse_json
       {|
-  { "r_name": {
-      "r_first": "Benjamin",
-      "r_last": "Sisko"
-    },
+  { "r_name": null,
     "r_favorite_number": 9,
     "r_location": null
   }
   |}
-      {
-        r_name = { r_first = "Benjamin"; r_last = "Sisko" };
-        r_favorite_number = 9;
-        r_location = None;
-      }
+      { r_name = None; r_favorite_number = 9; r_location = None }
 end
 
 module Type_variant = struct

@@ -32,7 +32,9 @@ let rec de_fun ~ctxt (t : core_type) =
       match name.txt |> Longident.name with
       | "option" ->
           let e = de_fun ~ctxt tp in
-          [%expr Serde.De.deserialize_option [%e e]]
+          if is_primitive_type tp then
+            [%expr Serde.De.deserialize_option [%e e]]
+          else [%expr Serde.De.deserialize_record_option [%e e]]
       | _ -> [%expr ()])
   | Ptyp_constr (name, _) -> (
       match name.txt |> Longident.name with

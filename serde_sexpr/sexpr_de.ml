@@ -113,12 +113,8 @@ Serde.De.Make (struct
 
   let deserialize_null :
       type value.
-      state ->
-      state Deserializer.t ->
-      value Visitor.t ->
-      (value option, 'error de_error) result =
-   fun _ (module De) (module V) ->
-    Error.unimplemented "uNimplemented: deserialize_null"
+      state -> state Deserializer.t -> (value option, 'error de_error) result =
+   fun _ (module De) -> Error.unimplemented "uNimplemented: deserialize_null"
 
   let deserialize_seq :
       type value.

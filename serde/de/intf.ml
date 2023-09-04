@@ -77,7 +77,6 @@ module rec Rec : sig
       'value 'error.
       state ->
       (module Rec.Deserializer_intf with type state = state) ->
-      (module Rec.Visitor_intf with type value = 'value) ->
       ('value option, 'error Error.de_error) result
 
     val deserialize_unit :
@@ -256,7 +255,6 @@ end = struct
       'value 'error.
       state ->
       (module Rec.Deserializer_intf with type state = state) ->
-      (module Rec.Visitor_intf with type value = 'value) ->
       ('value option, 'error Error.de_error) result
 
     val deserialize_unit :

@@ -78,12 +78,24 @@ let deserialize_option :
     value Visitor.t ->
     (value option, 'error de_error) result =
  fun fn (module De) (module V) ->
-  match De.deserialize_null De.state (module De) (module V) with
+  match De.deserialize_null De.state (module De) with
   | Ok _ -> Ok None
   | _ -> (
       match fn (module De) (module V) with
       | Ok x -> Ok (Some x)
       | Error _ as err -> err)
+
+let deserialize_record_option :
+    type state.
+    ((module Deserializer with type state = state) ->
+    ('a, 'error de_error) result) ->
+    (module Deserializer with type state = state) ->
+    ('a option, 'error de_error) result =
+ fun fn (module Self) ->
+  match Self.deserialize_null Self.state (module Self) with
+  | Ok _ -> Ok None
+  | _ -> (
+      match fn (module Self) with Ok x -> Ok (Some x) | Error _ as err -> err)
 
 let deserialize_identifier :
     type value state.
@@ -108,7 +120,7 @@ let deserialize_option_record :
     fields:string list ->
     (value option, 'error de_error) result =
  fun fn (module De) (module V) (module Field) ~name ~fields ->
-  match De.deserialize_null De.state (module De) (module V) with
+  match De.deserialize_null De.state (module De) with
   | Ok _ -> Ok None
   | _ -> (
       match fn (module De) (module V) (module Field) ~name ~fields with

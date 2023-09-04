@@ -53,11 +53,8 @@ Serde.De.Make (struct
 
   let deserialize_null :
       type value.
-      state ->
-      state Deserializer.t ->
-      value Visitor.t ->
-      (value option, 'error de_error) result =
-   fun state (module Self) (module V) ->
+      state -> state Deserializer.t -> (value option, 'error de_error) result =
+   fun state (module Self) ->
     Json.Parser.skip_space state;
     if
       not
