@@ -71,6 +71,32 @@ let deserialize_bool :
   | exception e -> Error.unexpected_exception e
   | res -> res
 
+let deserialize_option :
+    type value state.
+    (state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result) ->
+    state Deserializer.t ->
+    value Visitor.t ->
+    (value option, 'error de_error) result =
+ fun fn (module De) (module V) ->
+  match De.deserialize_null De.state (module De) with
+  | Ok _ -> Ok None
+  | _ -> (
+      match fn (module De) (module V) with
+      | Ok x -> Ok (Some x)
+      | Error _ as err -> err)
+
+let deserialize_record_option :
+    type state.
+    ((module Deserializer with type state = state) ->
+    ('a, 'error de_error) result) ->
+    (module Deserializer with type state = state) ->
+    ('a option, 'error de_error) result =
+ fun fn (module Self) ->
+  match Self.deserialize_null Self.state (module Self) with
+  | Ok _ -> Ok None
+  | _ -> (
+      match fn (module Self) with Ok x -> Ok (Some x) | Error _ as err -> err)
+
 let deserialize_identifier :
     type value state.
     state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
@@ -78,6 +104,28 @@ let deserialize_identifier :
   match De.deserialize_identifier De.state (module De) (module V) with
   | exception e -> Error.unexpected_exception e
   | res -> res
+
+let deserialize_option_record :
+    type value field state.
+    (state Deserializer.t ->
+    (value, field) Visitor.with_tag ->
+    field Visitor.t ->
+    name:string ->
+    fields:string list ->
+    (value, 'error de_error) result) ->
+    state Deserializer.t ->
+    (value, field) Visitor.with_tag ->
+    field Visitor.t ->
+    name:string ->
+    fields:string list ->
+    (value option, 'error de_error) result =
+ fun fn (module De) (module V) (module Field) ~name ~fields ->
+  match De.deserialize_null De.state (module De) with
+  | Ok _ -> Ok None
+  | _ -> (
+      match fn (module De) (module V) (module Field) ~name ~fields with
+      | Ok x -> Ok (Some x)
+      | Error _ as err -> err)
 
 let deserialize_record :
     type value field state.
