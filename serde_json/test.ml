@@ -40,6 +40,11 @@ let parse_json eq fn s t =
   | Ok t' -> eq t t'
   | Error err -> print_err err
 
+let parse_json_want_err _ fn s _ =
+  match Serde_json.of_string fn s |> Result.map_error (fun x -> `De x) with
+  | Ok _ -> false
+  | Error _ -> true
+
 module Type_alias = struct
   type alias = int [@@deriving eq, serializer, deserializer]
 
@@ -92,6 +97,41 @@ module Type_record = struct
   }
   |}
       { r_name = "Benjamin Sisko"; r_favorite_number = 9; r_location = "Bajor" }
+end
+
+module Type_record_optionals = struct
+  type num_and_col = { r_num : int option; r_col : string option }
+  [@@deriving eq, deserializer]
+
+  type record = {
+    r_name : string;
+    r_num_and_col : num_and_col option;
+    r_location : string option;
+  }
+  [@@deriving eq, deserializer]
+
+  let parse_json = parse_json equal_record deserialize_record
+  let parse_json_want_err = parse_json_want_err equal_record deserialize_record
+
+  let%test "parse packed json representation" =
+    parse_json {| [ "Benjamin Sisko", [9, "Blue"], "Bajor", ] |}
+      {
+        r_name = "Benjamin Sisko";
+        r_num_and_col = Some { r_num = Some 9; r_col = Some "Blue" };
+        r_location = Some "Bajor";
+      }
+
+  let%test "parse object json representation with missing fields" =
+    parse_json {|
+  { "r_name": "Benjamin Sisko" }
+  |}
+      { r_name = "Benjamin Sisko"; r_num_and_col = None; r_location = None }
+
+  let%test "non-optional missing fields raise error" =
+    parse_json_want_err {|
+  { "r_favorite_number": 9 }
+  |}
+      { r_name = "Benjamin Sisko"; r_num_and_col = None; r_location = None }
 end
 
 module Type_variant = struct

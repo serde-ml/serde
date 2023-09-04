@@ -2,6 +2,11 @@ open Ppxlib
 module Ast = Ast_builder.Default
 open De_base
 
+let ctyp_is_option ctyp =
+  match ctyp.ptyp_desc with
+  | Ptyp_constr (name, _) -> name.txt |> Longident.name = "option"
+  | _ -> false
+
 (** implementation *)
 let gen_visit_map ~ctxt ~type_name:_ ?constructor ~field_visitor kvs parts =
   let loc = loc ~ctxt in
@@ -21,13 +26,20 @@ let gen_visit_map ~ctxt ~type_name:_ ?constructor ~field_visitor kvs parts =
 
   let extract_fields =
     List.fold_left
-      (fun body (name, pat, _ctyp, exp, _field_variant) ->
+      (fun body (name, pat, ctyp, exp, _field_variant) ->
         let op = var ~ctxt "let*" in
         let exp =
-          [%expr
-            match ![%e exp] with
-            | Some value -> Ok value
-            | None -> Serde.De.Error.missing_field [%e name |> Ast.estring ~loc]]
+          if ctyp_is_option ctyp then
+            [%expr
+              match ![%e exp] with
+              | Some value -> Ok (Some value)
+              | None -> Ok None]
+          else
+            [%expr
+              match ![%e exp] with
+              | Some value -> Ok value
+              | None ->
+                  Serde.De.Error.missing_field [%e name |> Ast.estring ~loc]]
         in
         let let_ = Ast.binding_op ~op ~loc ~pat ~exp in
         Ast.letop ~let_ ~ands:[] ~body |> Ast.pexp_letop ~loc)
@@ -133,14 +145,24 @@ let gen_visit_seq ~ctxt ~type_name ?constructor kvs parts =
         in
 
         let body =
-          [%expr
-            let deser_element () = [%e deser_element] in
-            let* r =
-              Serde.De.Sequence_access.next_element seq_access ~deser_element
-            in
-            match r with
-            | None -> Serde.De.Error.message (Printf.sprintf [%e err_msg])
-            | Some f0 -> Ok f0]
+          if ctyp_is_option ctyp then
+            [%expr
+              let deser_element () = [%e deser_element] in
+              let* r =
+                Serde.De.Sequence_access.next_element seq_access ~deser_element
+              in
+              match r with
+              | None -> Serde.De.Error.message (Printf.sprintf [%e err_msg])
+              | Some f0 -> Ok (Some f0)]
+          else
+            [%expr
+              let deser_element () = [%e deser_element] in
+              let* r =
+                Serde.De.Sequence_access.next_element seq_access ~deser_element
+              in
+              match r with
+              | None -> Serde.De.Error.message (Printf.sprintf [%e err_msg])
+              | Some f0 -> Ok f0]
         in
 
         (pat, body))
