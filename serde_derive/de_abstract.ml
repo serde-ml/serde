@@ -2,6 +2,14 @@ open Ppxlib
 module Ast = Ast_builder.Default
 open De_base
 
+(* Implements support for deserializing into types that have arguments *)
+let gen_deserialize_constr_impl ~ctxt (type_name:label) (_tyargs: core_type list) =
+  let loc = loc ~ctxt in
+
+  Printf.printf "gen_deserialize for %s" type_name;
+
+  ([], [%expr false ])
+
 let gen_deserialize_abstract_tuple_impl ~ctxt type_name parts =
   let loc = loc ~ctxt in
 
@@ -143,7 +151,8 @@ let gen_deserialize_abstract_impl ~ctxt type_name (manifest : core_type) =
             [%e visitor_mod ~ctxt manifest |> Option.get]]
       in
       ([], deserialize_body)
-  | Ptyp_constr (_, _)
+  | Ptyp_constr (_, tyargs) ->
+      gen_deserialize_constr_impl ~ctxt type_name.txt tyargs
   | Ptyp_any | Ptyp_var _
   | Ptyp_arrow (_, _, _)
   | Ptyp_object (_, _)

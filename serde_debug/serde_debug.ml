@@ -14,6 +14,7 @@ type dbg =
   | Variant_tuple of (string * string * dbg list)
   | Variant_record of (string * string * (string * dbg) list)
   | Record of (string * (string * dbg) list)
+  | Sequence of (string * dbg list)
 
 module Serializer : Ser.Intf with type output = dbg = Ser.Make (struct
   type output = dbg
@@ -57,6 +58,12 @@ module Serializer : Ser.Intf with type output = dbg = Ser.Make (struct
       _output ~type_name ~record_size:_ ~fields =
     let* fields = Ser.map_field fields in
     Ok (Record (type_name, fields))
+
+  and serialize_seq
+      (module Ser : Ser.Mapper with type output = output and type error = error)
+      _output ~type_name ~elements =
+    let* elements = Ser.map elements in
+    Ok (Sequence (type_name, elements))
 end)
 
 let rec pp ppf (t : dbg) =
@@ -86,6 +93,13 @@ let rec pp ppf (t : dbg) =
           Format.fprintf ppf "  %s = %a" field pp value)
         ppf fields;
       Format.fprintf ppf "\n}"
+  | Sequence (ty, elements) ->
+      Format.fprintf ppf "%s [\n" ty;
+      Format.pp_print_list
+        ~pp_sep:(fun ppf () -> Format.fprintf ppf ";\n")
+        (fun ppf value -> Format.fprintf ppf "  %a" pp value)
+        ppf elements;
+      Format.fprintf ppf "\n]"
 
 let debug fn t =
   let* t = fn t in

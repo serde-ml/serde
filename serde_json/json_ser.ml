@@ -44,3 +44,9 @@ and serialize_record
     _output ~type_name:_ ~record_size:_ ~fields =
   let* fields = Ser.map_field fields in
   Ok (Json.Object fields)
+
+and serialize_seq
+    (module Ser : Ser.Mapper with type output = output and type error = error)
+    _output ~type_name:_ ~elements =
+  let* fields = Ser.map elements in
+  Ok (Json.Array fields)

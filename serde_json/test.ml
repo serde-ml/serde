@@ -2,6 +2,7 @@ open Serde
 
 let ( let* ) = Result.bind
 
+(*
 let print_err err =
   match err with
   | `De (`Unimplemented msg) ->
@@ -103,6 +104,7 @@ module Type_variant = struct
     | Tuple1 of string
     | Tuple2 of string * Type_alias.alias
     | Record3 of { name : name; favorite_number : int; location : string }
+    | List of name list
   [@@deriving eq, serializer, deserializer]
 
   let parse_json = parse_json equal_variant deserialize_variant
@@ -144,7 +146,6 @@ module Type_variant = struct
          })
 end
 
-(*
 module Type_generics_applied = struct
   type 'value pair = 'value * 'value [@@deriving eq]
   type v2f = float pair [@@deriving eq, serializer, deserializer]
@@ -154,3 +155,8 @@ module Type_generics_applied = struct
   let%test _ = parse_sexpr "(1.2 2.3)" (1.2, 2.3)
 end
 *)
+
+module Lists = struct
+  type t = string list
+  [@@deriving serializer, deserializer]
+end

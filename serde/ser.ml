@@ -96,6 +96,13 @@ module type Intf = sig
     record_size:int ->
     fields:(string * data) list ->
     (output, error ser_error) result
+
+  val serialize_seq :
+    (module Mapper with type output = output and type error = error) ->
+    output ->
+    type_name:string ->
+    elements:data list ->
+    (output, error ser_error) result
 end
 
 module Unimplemented = struct
@@ -121,6 +128,8 @@ module Unimplemented = struct
 
   let serialize_record _ser _output ~type_name:_ ~record_size:_ ~fields:_ =
     Error Unimplemented
+
+  let serialize_seq _ser _output ~type_name:_ ~elements:_ = Error Unimplemented
 end
 
 module Make (B : Intf) = struct
@@ -151,6 +160,9 @@ let serialize_record_variant ~typename:vr_type ~variant_idx:vr_idx
 
 let serialize_record ~typename:rec_type ~size:rec_size ~fields:rec_fields =
   Ok (Data.Record { rec_type; rec_size; rec_fields })
+
+let serialize_seq ~typename:seq_type ~elements:seq_elements =
+  Ok (Data.Sequence { seq_type; seq_elements })
 
 let rec serialize :
     type output error.
@@ -213,3 +225,7 @@ let rec serialize :
       Ser.serialize_record
         (module Mapper)
         output ~type_name:rec_type ~record_size:rec_size ~fields:rec_fields
+  | Sequence { seq_type; seq_elements } ->
+      Ser.serialize_seq
+        (module Mapper)
+        output ~type_name:seq_type ~elements:seq_elements

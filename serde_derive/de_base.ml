@@ -24,14 +24,16 @@ let de_fun ~ctxt (t : core_type) =
   let loc = loc ~ctxt in
   match t.ptyp_desc with
   (* Serialize a constructor *)
-  | Ptyp_constr (name, _) -> (
-      match name.txt |> Longident.name with
-      | "bool" -> [%expr Serde.De.deserialize_bool]
-      | "char" -> [%expr Serde.De.deserialize_char]
-      | "float" -> [%expr Serde.De.deserialize_float]
-      | "int" -> [%expr Serde.De.deserialize_int]
-      | "string" -> [%expr Serde.De.deserialize_string]
-      | "unit" -> [%expr Serde.De.deserialize_unit]
+  | Ptyp_constr (name, ty_args) -> (
+      Printf.printf "visitor_mod for = %s\n" (name.txt |> Longident.name);
+      match (name.txt |> Longident.name, ty_args) with
+      | "bool", _ -> [%expr Serde.De.deserialize_bool]
+      | "char", _ -> [%expr Serde.De.deserialize_char]
+      | "float", _ -> [%expr Serde.De.deserialize_float]
+      | "int", _ -> [%expr Serde.De.deserialize_int]
+      | "string", _ -> [%expr Serde.De.deserialize_string]
+      | "unit", _ -> [%expr Serde.De.deserialize_unit]
+      | "list", _ -> [%expr Serde.De.deserialize_seq]
       | _ ->
           let ser_fn_name =
             match name.txt |> Longident.flatten_exn |> List.rev with

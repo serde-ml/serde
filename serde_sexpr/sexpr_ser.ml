@@ -58,4 +58,11 @@ include Serde.Ser.Make (struct
     let* fields = Ser.map_field fields in
     let fields = fields |> List.map (fun (_name, sexpr) -> sexpr) in
     Ok (S.List fields)
+
+  and serialize_seq
+      (module Ser : Serde.Ser.Mapper
+        with type output = output
+         and type error = error) _output ~type_name:_ ~elements =
+    let* elements = Ser.map elements in
+    Ok (S.List elements)
 end)

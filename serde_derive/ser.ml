@@ -14,15 +14,29 @@ let rec ser_fun ~ctxt ~v (t : core_type) =
   let loc = loc ~ctxt in
   match t.ptyp_desc with
   (* Serialize a constructor *)
-  | Ptyp_constr (name, _) -> (
-      match name.txt |> Longident.name with
-      | "bool" -> [%expr Ser.serialize_bool [%e v]]
-      | "char" -> [%expr Ser.serialize_char [%e v]]
-      | "float" -> [%expr Ser.serialize_float [%e v]]
-      | "int" -> [%expr Ser.serialize_int [%e v]]
-      | "string" -> [%expr Ser.serialize_string [%e v]]
-      | "unit" -> [%expr Ser.serialize_unit [%e v]]
-      | _ ->
+  | Ptyp_constr (name, ty_args) -> (
+      match (name.txt |> Longident.name, ty_args) with
+      | "bool", _ -> [%expr Ser.serialize_bool [%e v]]
+      | "char", _ -> [%expr Ser.serialize_char [%e v]]
+      | "float", _ -> [%expr Ser.serialize_float [%e v]]
+      | "int", _ -> [%expr Ser.serialize_int [%e v]]
+      | "string", _ -> [%expr Ser.serialize_string [%e v]]
+      | "unit", _ -> [%expr Ser.serialize_unit [%e v]]
+      | "list", [ typ ] ->
+          let ser_typ = ser_fun ~ctxt ~v typ in
+          [%expr
+            let elements = List.map (fun f_0 -> [%e ser_typ]) [%e v] in
+            let* elements =
+              List.fold_left
+                (fun acc el ->
+                  match (acc, el) with
+                  | Ok ls, Ok el -> Ok (el :: ls)
+                  | Ok _, Error err -> Error err
+                  | _, _ -> acc)
+                (Ok []) elements
+            in
+            Ser.serialize_seq ~typename:"list" ~elements]
+      | _, _ ->
           let ser_fn_name =
             match name.txt |> Longident.flatten_exn |> List.rev with
             | name :: [] -> "serialize_" ^ name

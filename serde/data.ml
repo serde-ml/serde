@@ -26,3 +26,4 @@ type t =
       rec_size : int;
       rec_fields : (string * t) list;
     }
+  | Sequence of { seq_type : string; seq_elements : t list }

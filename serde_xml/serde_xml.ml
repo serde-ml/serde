@@ -137,6 +137,21 @@ module Ser : Ser.Intf with type output = Tyxml.Xml.elt = Ser.Make (struct
              Tyxml.Xml.string_attrib "size" (Int.to_string record_size);
            ]
          "record" fields)
+
+  let serialize_seq
+      (module Ser : Ser.Mapper with type output = output and type error = error)
+      _output ~type_name ~elements =
+    let* elements = Ser.map elements in
+
+    Ok
+      (Tyxml.Xml.node
+         ~a:
+           [
+             Tyxml.Xml.string_attrib "name" type_name;
+             Tyxml.Xml.string_attrib "size"
+               (Int.to_string (List.length elements));
+           ]
+         "seq" elements)
 end)
 
 let to_string_pretty t =
