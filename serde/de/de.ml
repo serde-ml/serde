@@ -93,9 +93,10 @@ let deserialize_record_option :
     ('a option, 'error de_error) result =
  fun fn (module De) ->
   match De.deserialize_null De.state (module De) with
-  | Ok _ -> Ok None
-  | _ -> (
-      match fn (module De) with Ok x -> Ok (Some x) | Error _ as err -> err)
+  | Ok () -> Ok None
+  | Error _err ->
+      let* result = fn (module De) in
+      Ok (Some result)
 
 let deserialize_identifier :
     type value state.
