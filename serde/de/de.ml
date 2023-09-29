@@ -71,6 +71,33 @@ let deserialize_bool :
   | exception e -> Error.unexpected_exception e
   | res -> res
 
+let deserialize_option :
+    type value state.
+    (state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result) ->
+    state Deserializer.t ->
+    value Visitor.t ->
+    (value option, 'error de_error) result =
+ fun fn (module De) (module V) ->
+  match De.deserialize_null De.state (module De) with
+  | Ok _ -> Ok None
+  | _ -> (
+      match fn (module De) (module V) with
+      | Ok x -> Ok (Some x)
+      | Error _ as err -> err)
+
+let deserialize_record_option :
+    type state.
+    ((module Deserializer with type state = state) ->
+    ('a, 'error de_error) result) ->
+    (module Deserializer with type state = state) ->
+    ('a option, 'error de_error) result =
+ fun fn (module De) ->
+  match De.deserialize_null De.state (module De) with
+  | Ok () -> Ok None
+  | Error _err ->
+      let* result = fn (module De) in
+      Ok (Some result)
+
 let deserialize_identifier :
     type value state.
     state Deserializer.t -> value Visitor.t -> (value, 'error de_error) result =
