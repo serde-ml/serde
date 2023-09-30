@@ -13,6 +13,7 @@ depends: [
   "serde_derive" {= version}
   "ppx_inline_test" {>= "v0.16.0"}
   "yojson" {>= "2.1.0"}
+  "ppx_yojson_conv" {with-test & >= "v0.16.0"}
   "odoc" {with-doc}
 ]
 build: [

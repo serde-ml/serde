@@ -111,9 +111,9 @@ Serde.De.Make (struct
             found: " ^ String.make 1 c)
     | None -> Error.message "end of stream!"
 
-  let deserialize_null :
+  let deserialize_option :
       type value.
-      state -> state Deserializer.t -> (value option, 'error de_error) result =
+      state -> state Deserializer.t -> (unit, 'error de_error) result =
    fun _ (module De) -> Error.unimplemented "unimplemented: deserialize_null"
 
   let deserialize_seq :

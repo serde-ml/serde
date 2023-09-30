@@ -73,11 +73,11 @@ module rec Rec : sig
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
-    val deserialize_null :
+    val deserialize_option :
       'value 'error.
       state ->
       (module Rec.Deserializer_intf with type state = state) ->
-      ('value option, 'error Error.de_error) result
+      (unit, 'error Error.de_error) result
 
     val deserialize_unit :
       'value 'error.
@@ -251,11 +251,11 @@ end = struct
       (module Rec.Visitor_intf with type value = 'value) ->
       ('value, 'error Error.de_error) result
 
-    val deserialize_null :
+    val deserialize_option :
       'value 'error.
       state ->
       (module Rec.Deserializer_intf with type state = state) ->
-      ('value option, 'error Error.de_error) result
+      (unit, 'error Error.de_error) result
 
     val deserialize_unit :
       'value 'error.

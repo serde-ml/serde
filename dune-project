@@ -21,6 +21,8 @@
    (ocaml (>= "4.14.0"))
    (ppx_inline_test (>= "v0.16.0"))
    (bechamel (and :with-test (>= "0.4.0")))
+   (bechamel-notty (and :with-test (>= "0.4.0")))
+   (notty (and :with-test (>= "0.2.3")))
    ))
 
 (package
@@ -54,6 +56,7 @@
    (serde_derive (= :version))
    (ppx_inline_test (>= "v0.16.0"))
    (yojson (>= "2.1.0"))
+   (ppx_yojson_conv (and :with-test (>= "v0.16.0")))
    ))
 
 (package

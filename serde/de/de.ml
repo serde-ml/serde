@@ -78,7 +78,7 @@ let deserialize_option :
     value Visitor.t ->
     (value option, 'error de_error) result =
  fun fn (module De) (module V) ->
-  match De.deserialize_null De.state (module De) with
+  match De.deserialize_option De.state (module De) with
   | Ok _ -> Ok None
   | _ -> (
       match fn (module De) (module V) with
@@ -92,9 +92,10 @@ let deserialize_record_option :
     (module Deserializer with type state = state) ->
     ('a option, 'error de_error) result =
  fun fn (module De) ->
-  match De.deserialize_null De.state (module De) with
+  match De.deserialize_option De.state (module De) with
   | Ok () -> Ok None
   | Error _err ->
+      let (let*) = Result.bind in
       let* result = fn (module De) in
       Ok (Some result)
 
