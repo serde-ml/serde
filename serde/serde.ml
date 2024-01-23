@@ -1,5 +1,5 @@
 module Ser = Ser
-module De = De
+module De = Serde_de
 
 let serialize = Ser.serialize
 

@@ -1,4 +1,4 @@
 (library
  (name serde)
  (public_name serde)
- (libraries de))
+ (libraries serde_de))
