@@ -1,3 +1,0 @@
-(library
- (name serde_de)
- (public_name serde.de))

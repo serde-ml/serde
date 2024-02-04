@@ -1,7 +1,0 @@
-(library
- (name serde_derive)
- (public_name serde_derive)
- (preprocess
-  (pps ppxlib.metaquot))
- (kind ppx_rewriter)
- (libraries serde ppxlib))
