@@ -27,25 +27,38 @@ module Chain = struct
   let run fn = Run fn
   let chain fn run = Chain (run, fn)
 
-  let rec apply : type v i o. (i, v -> o) chain -> v -> i -> (o, error) result =
-   fun chain v input ->
+  let rec apply :
+      type v i o.
+      between:(i -> (unit, error) result) ->
+      (i, v -> o) chain ->
+      v ->
+      i ->
+      (o, error) result =
+   fun ~between chain v input ->
     match chain with
     | Run fn -> Ok (fn v)
     | Chain (chain, fn) ->
         let* v1 = fn input in
-        let* next = apply chain v1 input in
+        let* () = between input in
+        let* next = apply ~between chain v1 input in
         Ok (next v)
 
-  let execute : type i o. (i, o) chain -> i -> (o, error) result =
-   fun chain input ->
+  let execute :
+      type i o.
+      between:(i -> (unit, error) result) ->
+      (i, o) chain ->
+      i ->
+      (o, error) result =
+   fun ~between chain input ->
     match chain with
     | Run _fn -> assert false
     | Chain (next, fn) ->
         let* v = fn input in
-        apply next v input
+        let* () = between input in
+        apply ~between next v input
 
-  let execute chain input =
-    let* result = execute chain input in
+  let execute ?(between = fun _ -> Ok ()) chain input =
+    let* result = execute ~between chain input in
     result
 end
 
