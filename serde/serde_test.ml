@@ -149,7 +149,25 @@ let _serde_deserializer_repr_tests =
               Cstr_args
                 {
                   cstr_name = "B";
-                  cstr_fn = (fun _config _de _input -> Error `unimplemented);
+                  cstr_fn = Serde.Chain.run (fun () -> Error `unimplemented);
+                };
+            ];
+        });
+
+  test "variant_with_many_args"
+    De.(
+      variant "variant"
+        [ constructor "C" (fun i str -> C (i, str)) |> arg int |> arg string ])
+    De.(
+      Variant
+        {
+          var_name = "variant";
+          var_cstrs =
+            [
+              Cstr_args
+                {
+                  cstr_name = "C";
+                  cstr_fn = Serde.Chain.run (fun () -> Error `unimplemented);
                 };
             ];
         });

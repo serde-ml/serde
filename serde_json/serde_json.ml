@@ -128,12 +128,17 @@ let to_string ?config ser value =
 
 module Json_de = struct
   open De
+  open Json
 
-  type input = Json.Parser.t
+  type input = Parser.t
 
   let deserialize_int _config input =
-    Json.Parser.skip_space input;
-    Json.Parser.read_int input
+    Parser.skip_space input;
+    Parser.read_int input
+
+  let deserialize_string _config input =
+    Parser.skip_space input;
+    Parser.read_string input
 
   let find_cstr_by_tag tag cstrs =
     List.find_opt
@@ -145,24 +150,30 @@ module Json_de = struct
       cstrs
 
   let deserialize_variant config self { var_name = _; var_cstrs } input =
-    Json.Parser.skip_space input;
-    match Json.Parser.peek input with
-    | Some '"' -> (
-        let* tag = Json.Parser.read_string input in
-        match find_cstr_by_tag tag var_cstrs with
-        | Some (Cstr_unit { ucstr_val; _ }) -> Ok ucstr_val
-        | _ -> Error `invalid_field_type)
+    Parser.skip_space input;
+    match Parser.peek input with
     | Some '{' -> (
-        let* () = Json.Parser.read_object_start input in
-        Json.Parser.skip_space input;
-        let* tag = Json.Parser.read_string input in
-        Json.Parser.skip_space input;
-        let* () = Json.Parser.read_colon input in
+        let* () = Parser.read_object_start input in
+        Parser.skip_space input;
+        let* tag = Parser.read_string input in
+        Parser.skip_space input;
+        let* () = Parser.read_colon input in
+        Parser.skip_space input;
+        let* () = Parser.read_open_bracket input in
         match find_cstr_by_tag tag var_cstrs with
-        | Some (Cstr_args { cstr_fn; _ }) -> 
-            let* result = cstr_fn config self input in
-            let* () =  Json.Parser.read_object_end input in
+        | Some (Cstr_args { cstr_fn; _ }) ->
+            let ctx = (config, self, input) in
+            let* result = Serde.Chain.execute cstr_fn ctx in
+            Parser.skip_space input;
+            let* () = Parser.read_close_bracket input in
+            Parser.skip_space input;
+            let* () = Parser.read_object_end input in
             Ok result
+        | _ -> Error `invalid_field_type)
+    | Some '"' -> (
+        let* tag = Parser.read_string input in
+        match find_cstr_by_tag tag var_cstrs with
+        | Some (Cstr_unit { ucstr_val; _ }) -> ucstr_val
         | _ -> Error `invalid_field_type)
     | _ -> Error `unimplemented
 end

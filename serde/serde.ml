@@ -17,6 +17,38 @@ let pp_err fmt t =
   | `no_more_data -> Format.fprintf fmt "no_more_data"
   | `unimplemented -> Format.fprintf fmt "unimplemented"
 
+module Chain = struct
+  type (_, _) chain =
+    | Run : 'a -> ('input, 'a) chain
+    | Chain :
+        ('input, 'output -> 'a) chain * ('input -> ('output, error) result)
+        -> ('input, 'a) chain
+
+  let run fn = Run fn
+  let chain fn run = Chain (run, fn)
+
+  let rec apply : type v i o. (i, v -> o) chain -> v -> i -> (o, error) result =
+   fun chain v input ->
+    match chain with
+    | Run fn -> Ok (fn v)
+    | Chain (chain, fn) ->
+        let* v1 = fn input in
+        let* next = apply chain v1 input in
+        Ok (next v)
+
+  let execute : type i o. (i, o) chain -> i -> (o, error) result =
+   fun chain input ->
+    match chain with
+    | Run _fn -> assert false
+    | Chain (next, fn) ->
+        let* v = fn input in
+        apply next v input
+
+  let execute chain input =
+    let* result = execute chain input in
+    result
+end
+
 module Config = struct
   type t = { camelcase_fields : bool }
 
@@ -161,11 +193,10 @@ let rec serialize :
   | Ser.Variant_record r -> Fmt.serialize_variant_record self config r
 
 module rec De_base : sig
-  type ('input, 'value) builder =
-    Config.t ->
-    (module De_base.Intf with type input = 'input) ->
-    'input ->
-    ('value, error) result
+  type 'input build_ctx =
+    Config.t * (module De_base.Intf with type input = 'input) * 'input
+
+  type ('input, 'value) builder = ('input build_ctx, 'value) Chain.chain
 
   type ('input, 'value) t = Variant of ('input, 'value) variant
 
@@ -182,20 +213,20 @@ module rec De_base : sig
     type input
 
     val deserialize_int : Config.t -> input -> (int, error) result
+    val deserialize_string : Config.t -> input -> (string, error) result
 
     val deserialize_variant :
       Config.t ->
       (module De_base.Intf with type input = input) ->
-      (input, 'value) variant ->
+      (input, ('value, error) result) variant ->
       input ->
       ('value, error) result
   end
 end = struct
-  type ('input, 'value) builder =
-    Config.t ->
-    (module De_base.Intf with type input = 'input) ->
-    'input ->
-    ('value, error) result
+  type 'input build_ctx =
+    Config.t * (module De_base.Intf with type input = 'input) * 'input
+
+  type ('input, 'value) builder = ('input build_ctx, 'value) Chain.chain
 
   type ('input, 'value) t = Variant of ('input, 'value) variant
 
@@ -212,11 +243,12 @@ end = struct
     type input
 
     val deserialize_int : Config.t -> input -> (int, error) result
+    val deserialize_string : Config.t -> input -> (string, error) result
 
     val deserialize_variant :
       Config.t ->
       (module De_base.Intf with type input = input) ->
-      (input, 'value) variant ->
+      (input, ('value, error) result) variant ->
       input ->
       ('value, error) result
   end
@@ -248,27 +280,23 @@ module De = struct
     Cstr_unit { ucstr_name; ucstr_val }
 
   let constructor cstr_name cstr_fn =
-    Cstr_args { cstr_name; cstr_fn = (fun _config _de _input -> Ok cstr_fn) }
+    Cstr_args { cstr_name; cstr_fn = Chain.run cstr_fn }
 
-  let arg (arg : ('src, 'a) builder) (cstr : ('src, 'a -> 'b) cstr) :
-      ('src, 'b) cstr =
+  let arg arg cstr =
     match cstr with
     | Cstr_unit _ -> failwith "Cannot add arguments to unit constructor"
     | Cstr_args { cstr_name; cstr_fn } ->
-        Cstr_args
-          {
-            cstr_name;
-            cstr_fn =
-              (fun config de input ->
-                let* last_arg = arg config de input in
-                let* next = cstr_fn config de input in
-                Ok (next last_arg));
-          }
+        Cstr_args { cstr_name; cstr_fn = Chain.chain arg cstr_fn }
 
-  let int (type input) config (module De : Intf with type input = input)
-      (input : input) =
+  let int (type input)
+      (config, (module De : Intf with type input = input), (input : input)) =
     let* int = De.deserialize_int config input in
     Ok int
+
+  let string (type input)
+      (config, (module De : Intf with type input = input), (input : input)) =
+    let* string = De.deserialize_string config input in
+    Ok string
 end
 
 module Deserializer = struct
@@ -281,7 +309,7 @@ let deserialize :
     type src value.
     ?config:Config.t ->
     src deserializer ->
-    (src, value) De.t ->
+    (src, (value, error) result) De.t ->
     src ->
     (value, error) result =
  fun ?(config = Config.default) fmt shape input ->

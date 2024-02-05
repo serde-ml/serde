@@ -15,6 +15,9 @@ type record_nested = { nested : nested }
 let pp_variant fmt A = Format.fprintf fmt "A"
 let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i
 
+let pp_variant_with_many_arg fmt (C (i, str)) =
+  Format.fprintf fmt "(C (%d, %S))" i str
+
 let _serde_json_serializer_test =
   let test str ser value expected =
     let actual_str = Serde_json.to_string ser value |> Result.get_ok in
@@ -111,13 +114,24 @@ let _serde_json_deserializer_test =
   in
 
   test "variant_without_args" pp_variant
-    De.(variant "variant" [ unit_constructor "A" A ])
+    De.(variant "variant" [ unit_constructor "A" (Ok A) ])
     {|"A"|} A;
 
-  test "variant_with_one_arg"
-  pp_variant_with_arg
-    De.(variant "variant" [ constructor "B" (fun i -> (B i)) |> arg int ])
-    {| { "B": 1 } |}
-    (B 1);
+  test "variant_with_one_arg" pp_variant_with_arg
+    De.(variant "variant" [ constructor "B" (fun i -> Ok (B i)) |> arg int ])
+    {| { "B": [1] } |} (B 1);
+
+  test "variant_with_one_arg" pp_variant_with_many_arg
+
+    De.(
+      variant "variant"
+        [ constructor "C" (fun i str -> Ok (C (i, str)))
+          |> arg int
+          |> arg string
+        ])
+
+    {| { "C": ["rush", 1] } |}
+    (C (2112, "rush"));
 
   ()
+  
