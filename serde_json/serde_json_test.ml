@@ -122,16 +122,44 @@ let _serde_json_deserializer_test =
     {| { "B": [1] } |} (B 1);
 
   test "variant_with_one_arg" pp_variant_with_many_arg
-
     De.(
       variant "variant"
-        [ constructor "C" (fun i str -> Ok (C (i, str)))
-          |> arg int
+        [
+          constructor "C" (fun str i -> Ok (C (i, str)))
           |> arg string
+          |> arg int 
         ])
-
-    {| { "C": ["rush", 1] } |}
+    {| { "C": [2112, "rush"] } |}
     (C (2112, "rush"));
 
   ()
-  
+
+let _serde_json_roundtrip_tests =
+  let test str pp ser de value =
+    let actual_str =
+      match 
+        let* json = Serde_json.to_string ser value in
+        Printf.printf "json: %S\n%!" json;
+        Serde_json.of_string de json
+      with
+      | Ok actual -> Format.asprintf "%a" pp actual
+      | Error err -> Format.asprintf "Exception: %a" Serde.pp_err err
+    in
+    let expect_str = Format.asprintf "%a" pp value in
+
+    if String.equal actual_str expect_str then
+      Format.printf "serde_json.de test %S %s\r\n%!" str (keyword "OK")
+    else (
+      Format.printf "%s\n\nExpected:\n\n%s\n\nbut found:\n\n%s\n\n"
+        (error "JSON does not match")
+        expect_str actual_str;
+      assert false)
+  in
+
+  test "variant_without_args" pp_variant
+    Ser.(fun A -> variant "variant" (unit_constructor "A"))
+    De.(variant "variant" [ unit_constructor "A" (Ok A) ])
+    A;
+
+  ()
+;;

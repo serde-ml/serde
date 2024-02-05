@@ -134,11 +134,15 @@ module Json_de = struct
 
   let deserialize_int _config input =
     Parser.skip_space input;
-    Parser.read_int input
+    let* int = Parser.read_int input in
+    Printf.printf "deserialized int %d\n%!" int;
+    Ok int
 
   let deserialize_string _config input =
     Parser.skip_space input;
-    Parser.read_string input
+    let* str = Parser.read_string input in
+    Printf.printf "deserialized string %S\n%!" str;
+    Ok str
 
   let find_cstr_by_tag tag cstrs =
     List.find_opt
@@ -163,7 +167,12 @@ module Json_de = struct
         match find_cstr_by_tag tag var_cstrs with
         | Some (Cstr_args { cstr_fn; _ }) ->
             let ctx = (config, self, input) in
-            let* result = Serde.Chain.execute cstr_fn ctx in
+            let* result =
+              Serde.Chain.execute
+                ~between:(fun (_config, _self, input) ->
+                  Parser.read_comma input)
+                cstr_fn ctx
+            in
             Parser.skip_space input;
             let* () = Parser.read_close_bracket input in
             Parser.skip_space input;
