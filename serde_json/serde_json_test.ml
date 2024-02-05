@@ -126,8 +126,7 @@ let _serde_json_deserializer_test =
       variant "variant"
         [
           constructor "C" (fun str i -> Ok (C (i, str)))
-          |> arg string
-          |> arg int 
+          |> arg string |> arg int;
         ])
     {| { "C": [2112, "rush"] } |}
     (C (2112, "rush"));
@@ -137,7 +136,7 @@ let _serde_json_deserializer_test =
 let _serde_json_roundtrip_tests =
   let test str pp ser de value =
     let actual_str =
-      match 
+      match
         let* json = Serde_json.to_string ser value in
         Printf.printf "json: %S\n%!" json;
         Serde_json.of_string de json
@@ -157,9 +156,8 @@ let _serde_json_roundtrip_tests =
   in
 
   test "variant_without_args" pp_variant
-    Ser.(fun A -> variant "variant" (constructor "A" []))
+    Ser.(fun A -> variant_unit "variant" "A")
     De.(variant "variant" [ unit_constructor "A" (Ok A) ])
     A;
 
   ()
-;;

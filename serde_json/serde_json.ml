@@ -119,6 +119,9 @@ module Json_ser : Serializer.Intf with type output = Json.t = struct
   let serialize_variant_record self _config { vrec_name; vrec_fields; _ } =
     let* fields = Serializer.map_fields self vrec_fields in
     Ok Json.(Object [ (vrec_name, Object fields) ])
+
+  let serialize_variant_unit _self _config { vunit_name; _ } =
+    Ok Json.(String vunit_name)
 end
 
 let to_string ?config ser value =

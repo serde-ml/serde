@@ -75,6 +75,7 @@ module Ser = struct
     | Record of record
     | Variant_cstr of variant
     | Variant_record of variant_record
+    | Variant_unit of variant_unit
 
   and field = { fld_name : string; fld_value : t }
   and record = { rec_type : string; rec_fields : field list }
@@ -91,6 +92,8 @@ module Ser = struct
     vrec_fields : field list;
   }
 
+  and variant_unit = { vunit_type : string; vunit_name : string }
+
   let rec pp fmt t =
     match t with
     | Bool b -> Format.fprintf fmt "(Bool %b)" b
@@ -103,7 +106,7 @@ module Ser = struct
     | Variant_cstr { vcstr_type; vcstr_name; vcstr_args } ->
         Format.fprintf fmt "(Variant {vcstr_type=%S;vcstr_name=%S; vcstr_args="
           vcstr_type vcstr_name;
-        pp_list pp fmt vcstr_args;
+        (pp_list pp) fmt vcstr_args;
         Format.fprintf fmt "})"
     | Variant_record { vrec_type; vrec_name; vrec_fields } ->
         Format.fprintf fmt
@@ -111,6 +114,9 @@ module Ser = struct
           vrec_name;
         pp_list pp_field fmt vrec_fields;
         Format.fprintf fmt "})"
+    | Variant_unit { vunit_type; vunit_name } ->
+        Format.fprintf fmt "(Variant_unit {vunit_type=%S;vunit_name=%S})"
+          vunit_type vunit_name
 
   and pp_field fmt { fld_name; fld_value } =
     Format.fprintf fmt "{ fld_name=%S; fld_value=%a }" fld_name pp fld_value
@@ -122,6 +128,9 @@ module Ser = struct
 
   let variant_record vrec_type (vrec_name, vrec_fields) =
     Variant_record { vrec_type; vrec_name; vrec_fields }
+
+  let variant_unit vunit_type vunit_name =
+    Variant_unit { vunit_type; vunit_name }
 
   let field fld_name fld_value = { fld_name; fld_value }
   let constructor name args = (name, args)
@@ -155,6 +164,12 @@ module Serializer = struct
       Config.t ->
       Ser.variant_record ->
       (output, error) result
+
+    val serialize_variant_unit :
+      (Ser.t -> (output, error) result) ->
+      Config.t ->
+      Ser.variant_unit ->
+      (output, error) result
   end
 
   module Default = struct
@@ -164,6 +179,7 @@ module Serializer = struct
     let serialize_record _ _ = Error `unimplemented
     let serialize_variant _ _ = Error `unimplemented
     let serialize_variant_record _ _ = Error `unimplemented
+    let serialize_variant_unit _ _ = Error `unimplemented
   end
 
   let rec map_fields serializer xs =
@@ -203,6 +219,7 @@ let rec serialize :
   | Ser.Str s -> Fmt.serialize_string config s
   | Ser.Variant_cstr v -> Fmt.serialize_variant self config v
   | Ser.Variant_record r -> Fmt.serialize_variant_record self config r
+  | Ser.Variant_unit u -> Fmt.serialize_variant_unit self config u
 
 module rec De_base : sig
   type 'input build_ctx =
