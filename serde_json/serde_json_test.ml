@@ -157,7 +157,7 @@ let _serde_json_roundtrip_tests =
   in
 
   test "variant_without_args" pp_variant
-    Ser.(fun A -> variant "variant" (unit_constructor "A"))
+    Ser.(fun A -> variant "variant" (constructor "A" []))
     De.(variant "variant" [ unit_constructor "A" (Ok A) ])
     A;
 

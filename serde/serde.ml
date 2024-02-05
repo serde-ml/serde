@@ -38,8 +38,8 @@ module Chain = struct
     match chain with
     | Run fn -> Ok (fn v)
     | Chain (chain, fn) ->
-        let* v1 = fn input in
         let* () = between input in
+        let* v1 = fn input in
         let* next = apply ~between chain v1 input in
         Ok (next v)
 
@@ -54,7 +54,6 @@ module Chain = struct
     | Run _fn -> assert false
     | Chain (next, fn) ->
         let* v = fn input in
-        let* () = between input in
         apply ~between next v input
 
   let execute ?(between = fun _ -> Ok ()) chain input =
