@@ -99,16 +99,37 @@ module Json = struct
   end
 end
 
+module Fmt = struct
+  let write w buf = Rio.write w ~buf |> Result.map (fun _ -> ())
+  let begin_object w = write w "{"
+  let end_object w = write w "}"
+  let begin_object_key ?(first = false) w = if first then Ok () else write w ","
+  let end_object_key _w = Ok ()
+  let begin_object_value w = write w ":"
+  let end_object_value _w = Ok ()
+end
+
 module Serializer = struct
   type output = unit
-  type state = S : { writer : 'w Rio.Writer.t } -> state
+  type state = S : { fmt : 'w Rio.Writer.t } -> state
 
-  let serialize_variant _self (S state) ~var_type:_ ~cstr_idx:_ ~cstr_name
-      ~cstr_args =
-    if cstr_args = 0 then
-      Rio.write_all state.writer ~buf:(Format.sprintf "%S" cstr_name)
-      |> Result.map_error (fun err -> `io_error err)
-    else Ok ()
+  let serialize_int _self (S { fmt }) int =
+    Rio.write_all fmt ~buf:(Int.to_string int)
+
+  let serialize_unit_variant _self (S { fmt }) ~var_type:_ ~cstr_idx:_
+      ~cstr_name =
+    Rio.write_all fmt ~buf:(Format.sprintf "%S" cstr_name)
+
+  let serialize_newtype_variant self (S { fmt }) ~var_type:_ ~cstr_idx:_
+      ~cstr_name field =
+    let* () = Fmt.begin_object fmt in
+    let* () = Fmt.begin_object_key ~first:true fmt in
+    let* () = Rio.write_all fmt ~buf:(Format.sprintf "%S" cstr_name) in
+    let* () = Fmt.end_object_key fmt in
+    let* () = Fmt.begin_object_value fmt in
+    let* () = Ser.serialize self field in
+    let* () = Fmt.end_object_value fmt in
+    Fmt.end_object fmt
 end
 
 module Deserializer = struct
@@ -116,12 +137,14 @@ module Deserializer = struct
 
   type state = { reader : Parser.t }
 
-  let deserialize_string self state visitor = 
-    let*str = Parser.read_string state.reader in
+  let deserialize_string self state visitor =
+    let* str = Parser.read_string state.reader in
     Visitor.visit_string self visitor str
 
   let deserialize_identifier self _state visitor =
     De.deserialize_string self visitor
+
+  let deserialize_unit_variant _self _state = Ok ()
 
   let deserialize_variant self state visitor ~name:_ ~variants:_ =
     Parser.skip_space state.reader;
@@ -132,7 +155,7 @@ end
 
 let to_string ser value =
   let buf = Buffer.create 0 in
-  let state = Serializer.S { writer = Rio.Buffer.to_writer buf } in
+  let state = Serializer.S { fmt = Rio.Buffer.to_writer buf } in
   let* () = Serde.serialize (module Serializer) state ser value in
   Ok (Buffer.to_bytes buf |> Bytes.unsafe_to_string)
 

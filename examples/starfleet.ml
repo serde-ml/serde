@@ -6,8 +6,8 @@ let serialize_rank =
   Ser.(
     serializer @@ fun ctx rank ->
     match rank with
-    | Captain -> variant ctx "rank" 0 "Captain" 0
-    | Chief_petty_officer -> variant ctx "rank" 0 "Chief_petty_officer" 0)
+    | Captain -> unit_variant ctx "rank" 0 "Captain"
+    | Chief_petty_officer -> unit_variant ctx "rank" 0 "Chief_petty_officer")
 
 (* let deserialize_rank = *)
 (*   De.( *)
