@@ -99,96 +99,43 @@ module Json = struct
   end
 end
 
-module Json_ser : Serializer.Intf with type output = Json.t = struct
-  open Ser
+module Serializer = struct
+  type output = unit
+  type state = S : { writer : 'w Rio.Writer.t } -> state
 
-  type output = Json.t
-
-  let serialize_bool _config bool = Json.Bool bool |> Result.ok
-  let serialize_int _config int = Json.Int int |> Result.ok
-  let serialize_string _config string = Json.String string |> Result.ok
-
-  let serialize_record self _config { rec_type; rec_fields } =
-    let* fields = Serializer.map_fields self rec_fields in
-    Ok Json.(Object [ (rec_type, Object fields) ])
-
-  let serialize_variant self _config { vcstr_name; vcstr_args; _ } =
-    let* fields = Serializer.map self vcstr_args in
-    Ok Json.(Object [ (vcstr_name, Array fields) ])
-
-  let serialize_variant_record self _config { vrec_name; vrec_fields; _ } =
-    let* fields = Serializer.map_fields self vrec_fields in
-    Ok Json.(Object [ (vrec_name, Object fields) ])
-
-  let serialize_variant_unit _self _config { vunit_name; _ } =
-    Ok Json.(String vunit_name)
+  let serialize_variant _self (S state) ~var_type:_ ~cstr_idx:_ ~cstr_name
+      ~cstr_args =
+    if cstr_args = 0 then
+      Rio.write_all state.writer ~buf:(Format.sprintf "%S" cstr_name)
+      |> Result.map_error (fun err -> `io_error err)
+    else Ok ()
 end
 
-let to_string ?config ser value =
-  let* json = Serde.serialize ?config (module Json_ser) ser value in
-  let yojson = Json.to_yojson json in
-  Ok (Yojson.Safe.pretty_to_string yojson)
-
-module Json_de = struct
-  open De
+module Deserializer = struct
   open Json
 
-  type input = Parser.t
+  type state = { reader : Parser.t }
 
-  let deserialize_int _config input =
-    Parser.skip_space input;
-    let* int = Parser.read_int input in
-    Printf.printf "deserialized int %d\n%!" int;
-    Ok int
+  let deserialize_string self state visitor = 
+    let*str = Parser.read_string state.reader in
+    Visitor.visit_string self visitor str
 
-  let deserialize_string _config input =
-    Parser.skip_space input;
-    let* str = Parser.read_string input in
-    Printf.printf "deserialized string %S\n%!" str;
-    Ok str
+  let deserialize_identifier self _state visitor =
+    De.deserialize_string self visitor
 
-  let find_cstr_by_tag tag cstrs =
-    List.find_opt
-      (fun cstr ->
-        match cstr with
-        | Cstr_args { cstr_name = name; _ } | Cstr_unit { ucstr_name = name; _ }
-          ->
-            String.equal name tag)
-      cstrs
-
-  let deserialize_variant config self { var_name = _; var_cstrs } input =
-    Parser.skip_space input;
-    match Parser.peek input with
-    | Some '{' -> (
-        let* () = Parser.read_object_start input in
-        Parser.skip_space input;
-        let* tag = Parser.read_string input in
-        Parser.skip_space input;
-        let* () = Parser.read_colon input in
-        Parser.skip_space input;
-        let* () = Parser.read_open_bracket input in
-        match find_cstr_by_tag tag var_cstrs with
-        | Some (Cstr_args { cstr_fn; _ }) ->
-            let ctx = (config, self, input) in
-            let* result =
-              Serde.Chain.execute
-                ~between:(fun (_config, _self, input) ->
-                  Parser.read_comma input)
-                cstr_fn ctx
-            in
-            Parser.skip_space input;
-            let* () = Parser.read_close_bracket input in
-            Parser.skip_space input;
-            let* () = Parser.read_object_end input in
-            Ok result
-        | _ -> Error `invalid_field_type)
-    | Some '"' -> (
-        let* tag = Parser.read_string input in
-        match find_cstr_by_tag tag var_cstrs with
-        | Some (Cstr_unit { ucstr_val; _ }) -> ucstr_val
-        | _ -> Error `invalid_field_type)
-    | _ -> Error `unimplemented
+  let deserialize_variant self state visitor ~name:_ ~variants:_ =
+    Parser.skip_space state.reader;
+    match Parser.peek state.reader with
+    | Some '"' -> Visitor.visit_variant self visitor
+    | _ -> assert false
 end
 
-let of_string ?config de value =
-  Serde.deserialize ?config (module Json_de) de (Json.Parser.of_string value)
+let to_string ser value =
+  let buf = Buffer.create 0 in
+  let state = Serializer.S { writer = Rio.Buffer.to_writer buf } in
+  let* () = Serde.serialize (module Serializer) state ser value in
+  Ok (Buffer.to_bytes buf |> Bytes.unsafe_to_string)
+
+let of_string de string =
+  let state = Deserializer.{ reader = Json.Parser.of_string string } in
+  Serde.deserialize (module Deserializer) state de

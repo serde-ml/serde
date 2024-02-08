@@ -1,6 +1,7 @@
 (library
  (public_name serde)
- (modules serde))
+ (modules serde)
+ (libraries rio))
 
 (test
  (package serde)

@@ -1,7 +1,7 @@
 (library
  (public_name serde_json)
  (modules serde_json)
- (libraries serde yojson))
+ (libraries serde rio yojson))
 
 (test
  (package serde_json)

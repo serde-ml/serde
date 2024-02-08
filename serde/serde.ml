@@ -8,7 +8,12 @@ let pp_list pp_el fmt t =
   Format.fprintf fmt "]"
 
 type error =
-  [ `invalid_field_type | `missing_field | `no_more_data | `unimplemented ]
+  [ `invalid_field_type
+  | `missing_field
+  | `no_more_data
+  | `unimplemented
+  | `invalid_tag
+  | `io_error of Rio.io_error ]
 
 let pp_err fmt t =
   match t with
@@ -16,50 +21,8 @@ let pp_err fmt t =
   | `missing_field -> Format.fprintf fmt "missing_field"
   | `no_more_data -> Format.fprintf fmt "no_more_data"
   | `unimplemented -> Format.fprintf fmt "unimplemented"
-
-module Chain = struct
-  type (_, _) chain =
-    | Run : 'a -> ('input, 'a) chain
-    | Chain :
-        ('input, 'output -> 'a) chain * ('input -> ('output, error) result)
-        -> ('input, 'a) chain
-
-  let run fn = Run fn
-  let chain fn run = Chain (run, fn)
-
-  let rec apply :
-      type v i o.
-      between:(i -> (unit, error) result) ->
-      (i, v -> o) chain ->
-      v ->
-      i ->
-      (o, error) result =
-   fun ~between chain v input ->
-    match chain with
-    | Run fn -> Ok (fn v)
-    | Chain (chain, fn) ->
-        let* () = between input in
-        let* v1 = fn input in
-        let* next = apply ~between chain v1 input in
-        Ok (next v)
-
-  let execute :
-      type i o.
-      between:(i -> (unit, error) result) ->
-      (i, o) chain ->
-      i ->
-      (o, error) result =
-   fun ~between chain input ->
-    match chain with
-    | Run _fn -> assert false
-    | Chain (next, fn) ->
-        let* v = fn input in
-        apply ~between next v input
-
-  let execute ?(between = fun _ -> Ok ()) chain input =
-    let* result = execute ~between chain input in
-    result
-end
+  | `invalid_tag -> Format.fprintf fmt "invalid_tag"
+  | `io_error err -> Rio.pp_err fmt err
 
 module Config = struct
   type t = { camelcase_fields : bool }
@@ -67,280 +30,225 @@ module Config = struct
   let default = { camelcase_fields = false }
 end
 
-module Ser = struct
-  type t =
-    | Bool of bool
-    | Int of int
-    | Str of string
-    | Record of record
-    | Variant_cstr of variant
-    | Variant_record of variant_record
-    | Variant_unit of variant_unit
+module rec Ser : sig
+  type ('value, 'state, 'output) ser_fn =
+    ('value, 'state, 'output) ctx -> 'value -> ('output, error) result
 
-  and field = { fld_name : string; fld_value : t }
-  and record = { rec_type : string; rec_fields : field list }
+  and ('value, 'state, 'output) t =
+    | Serialize of ('value, 'state, 'output) ser_fn
 
-  and variant = {
-    vcstr_type : string;
-    vcstr_name : string;
-    vcstr_args : t list;
-  }
+  and ('value, 'state, 'output) ctx =
+    ('value, 'state, 'output) t * ('state, 'output) Ser.serializer * 'state
 
-  and variant_record = {
-    vrec_type : string;
-    vrec_name : string;
-    vrec_fields : field list;
-  }
+  val serializer :
+    ('value, 'state, 'output) ser_fn -> ('value, 'state, 'output) t
 
-  and variant_unit = { vunit_type : string; vunit_name : string }
-
-  let rec pp fmt t =
-    match t with
-    | Bool b -> Format.fprintf fmt "(Bool %b)" b
-    | Int i -> Format.fprintf fmt "(Int %d)" i
-    | Record { rec_type; rec_fields } ->
-        Format.fprintf fmt "(Record (%S, " rec_type;
-        pp_list pp_field fmt rec_fields;
-        Format.fprintf fmt "))"
-    | Str s -> Format.fprintf fmt "(Str %S)" s
-    | Variant_cstr { vcstr_type; vcstr_name; vcstr_args } ->
-        Format.fprintf fmt "(Variant {vcstr_type=%S;vcstr_name=%S; vcstr_args="
-          vcstr_type vcstr_name;
-        (pp_list pp) fmt vcstr_args;
-        Format.fprintf fmt "})"
-    | Variant_record { vrec_type; vrec_name; vrec_fields } ->
-        Format.fprintf fmt
-          "(Variant_record {vrec_type=%S;vrec_name=%S; vrec_fields=" vrec_type
-          vrec_name;
-        pp_list pp_field fmt vrec_fields;
-        Format.fprintf fmt "})"
-    | Variant_unit { vunit_type; vunit_name } ->
-        Format.fprintf fmt "(Variant_unit {vunit_type=%S;vunit_name=%S})"
-          vunit_type vunit_name
-
-  and pp_field fmt { fld_name; fld_value } =
-    Format.fprintf fmt "{ fld_name=%S; fld_value=%a }" fld_name pp fld_value
-
-  let record rec_type rec_fields = Record { rec_type; rec_fields }
-
-  let variant vcstr_type (vcstr_name, vcstr_args) =
-    Variant_cstr { vcstr_type; vcstr_name; vcstr_args }
-
-  let variant_record vrec_type (vrec_name, vrec_fields) =
-    Variant_record { vrec_type; vrec_name; vrec_fields }
-
-  let variant_unit vunit_type vunit_name =
-    Variant_unit { vunit_type; vunit_name }
-
-  let field fld_name fld_value = { fld_name; fld_value }
-  let constructor name args = (name, args)
-  let int i = Int i
-  let string s = Str s
-  let bool b = Bool b
-end
-
-module Serializer = struct
-  module type Intf = sig
+  module type Serializer = sig
     type output
-
-    val serialize_bool : Config.t -> bool -> (output, error) result
-    val serialize_int : Config.t -> int -> (output, error) result
-    val serialize_string : Config.t -> string -> (output, error) result
-
-    val serialize_record :
-      (Ser.t -> (output, error) result) ->
-      Config.t ->
-      Ser.record ->
-      (output, error) result
+    type state
 
     val serialize_variant :
-      (Ser.t -> (output, error) result) ->
-      Config.t ->
-      Ser.variant ->
-      (output, error) result
-
-    val serialize_variant_record :
-      (Ser.t -> (output, error) result) ->
-      Config.t ->
-      Ser.variant_record ->
-      (output, error) result
-
-    val serialize_variant_unit :
-      (Ser.t -> (output, error) result) ->
-      Config.t ->
-      Ser.variant_unit ->
+      ('value, state, output) Ser.t ->
+      state ->
+      var_type:string ->
+      cstr_idx:int ->
+      cstr_name:string ->
+      cstr_args:int ->
       (output, error) result
   end
 
-  module Default = struct
-    let serialize_bool _ _ = Error `unimplemented
-    let serialize_int _ _ = Error `unimplemented
-    let serialize_string _ _ = Error `unimplemented
-    let serialize_record _ _ = Error `unimplemented
-    let serialize_variant _ _ = Error `unimplemented
-    let serialize_variant_record _ _ = Error `unimplemented
-    let serialize_variant_unit _ _ = Error `unimplemented
+  type ('state, 'output) serializer =
+    (module Serializer with type output = 'output and type state = 'state)
+
+  val variant :
+    ('value, 'state, 'output) ctx ->
+    string ->
+    int ->
+    string ->
+    int ->
+    ('output, error) result
+end = struct
+  type ('value, 'state, 'output) ser_fn =
+    ('value, 'state, 'output) ctx -> 'value -> ('output, error) result
+
+  and ('value, 'state, 'output) t =
+    | Serialize of ('value, 'state, 'output) ser_fn
+
+  and ('value, 'state, 'output) ctx =
+    ('value, 'state, 'output) t * ('state, 'output) Ser.serializer * 'state
+
+  let serializer fn = Serialize fn
+
+  module type Serializer = sig
+    type output
+    type state
+
+    val serialize_variant :
+      ('value, state, output) Ser.t ->
+      state ->
+      var_type:string ->
+      cstr_idx:int ->
+      cstr_name:string ->
+      cstr_args:int ->
+      (output, error) result
   end
 
-  let rec map_fields serializer xs =
-    match xs with
-    | [] -> Ok []
-    | Ser.{ fld_name; fld_value } :: xs ->
-        let* value = serializer fld_value in
-        let* tail = map_fields serializer xs in
-        Ok ((fld_name, value) :: tail)
+  type ('state, 'output) serializer =
+    (module Serializer with type output = 'output and type state = 'state)
 
-  let rec map serializer xs =
-    match xs with
-    | [] -> Ok []
-    | x :: xs ->
-        let* value = serializer x in
-        let* tail = map serializer xs in
-        Ok (value :: tail)
+  let variant (type value state output)
+      ((self, (module S), state) : (value, state, output) ctx) var_type cstr_idx
+      cstr_name cstr_args =
+    S.serialize_variant self state ~var_type ~cstr_idx ~cstr_name ~cstr_args
 end
 
-type 'fmt serializer = (module Serializer.Intf with type output = 'fmt)
-
-let rec serialize :
-    type fmt value.
-    ?config:Config.t ->
-    fmt serializer ->
-    (value -> Ser.t) ->
-    value ->
-    (fmt, error) result =
- fun ?(config = Config.default) fmt shape value ->
-  let self data = serialize ~config fmt (fun x -> x) data in
-  let (module Fmt) = fmt in
-  let data = shape value in
-  match data with
-  | Ser.Bool b -> Fmt.serialize_bool config b
-  | Ser.Int i -> Fmt.serialize_int config i
-  | Ser.Record r -> Fmt.serialize_record self config r
-  | Ser.Str s -> Fmt.serialize_string config s
-  | Ser.Variant_cstr v -> Fmt.serialize_variant self config v
-  | Ser.Variant_record r -> Fmt.serialize_variant_record self config r
-  | Ser.Variant_unit u -> Fmt.serialize_variant_unit self config u
-
 module rec De_base : sig
-  type 'input build_ctx =
-    Config.t * (module De_base.Intf with type input = 'input) * 'input
+  type ('value, 'state) t =
+    | Deserialize of ('state De_base.ctx -> ('value, error) result)
 
-  type ('input, 'value) builder = ('input build_ctx, 'value) Chain.chain
+  and 'state ctx = 'state De_base.deserializer * 'state
 
-  type ('input, 'value) t = Variant of ('input, 'value) variant
-
-  and ('input, 'value) variant = {
-    var_name : string;
-    var_cstrs : ('input, 'value) cstr list;
+  type ('value, 'state, 'tag) visitor = {
+    visit_string : 'state ctx -> string -> ('value, error) result;
+    visit_variant : 'state ctx -> ('value, error) result;
   }
 
-  and ('input, 'value) cstr =
-    | Cstr_unit of { ucstr_name : string; ucstr_val : 'value }
-    | Cstr_args of { cstr_name : string; cstr_fn : ('input, 'value) builder }
+  val deserializer :
+    ('state De_base.ctx -> ('value, error) result) -> ('value, 'state) t
 
-  module type Intf = sig
-    type input
-
-    val deserialize_int : Config.t -> input -> (int, error) result
-    val deserialize_string : Config.t -> input -> (string, error) result
+  module type Deserializer = sig
+    type state
 
     val deserialize_variant :
-      Config.t ->
-      (module De_base.Intf with type input = input) ->
-      (input, ('value, error) result) variant ->
-      input ->
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
+      name:string ->
+      variants:string list ->
+      ('value, error) result
+
+    val deserialize_identifier :
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
+      ('value, error) result
+
+    val deserialize_string :
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
       ('value, error) result
   end
+
+  type 'state deserializer = (module Deserializer with type state = 'state)
 end = struct
-  type 'input build_ctx =
-    Config.t * (module De_base.Intf with type input = 'input) * 'input
+  type ('value, 'state) t =
+    | Deserialize of ('state De_base.ctx -> ('value, error) result)
 
-  type ('input, 'value) builder = ('input build_ctx, 'value) Chain.chain
+  and 'state ctx = 'state De_base.deserializer * 'state
 
-  type ('input, 'value) t = Variant of ('input, 'value) variant
-
-  and ('input, 'value) variant = {
-    var_name : string;
-    var_cstrs : ('input, 'value) cstr list;
+  type ('value, 'state, 'tag) visitor = {
+    visit_string : 'state ctx -> string -> ('value, error) result;
+    visit_variant : 'state ctx -> ('value, error) result;
   }
 
-  and ('input, 'value) cstr =
-    | Cstr_unit of { ucstr_name : string; ucstr_val : 'value }
-    | Cstr_args of { cstr_name : string; cstr_fn : ('input, 'value) builder }
+  let deserializer fn = Deserialize fn
 
-  module type Intf = sig
-    type input
-
-    val deserialize_int : Config.t -> input -> (int, error) result
-    val deserialize_string : Config.t -> input -> (string, error) result
+  module type Deserializer = sig
+    type state
 
     val deserialize_variant :
-      Config.t ->
-      (module De_base.Intf with type input = input) ->
-      (input, ('value, error) result) variant ->
-      input ->
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
+      name:string ->
+      variants:string list ->
+      ('value, error) result
+
+    val deserialize_identifier :
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
+      ('value, error) result
+
+    val deserialize_string :
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
       ('value, error) result
   end
+
+  type 'state deserializer = (module Deserializer with type state = 'state)
+end
+
+module Visitor = struct
+  type ('value, 'state, 'tag) t = ('value, 'state, 'tag) De_base.visitor = {
+    visit_string : 'state De_base.ctx -> string -> ('value, error) result;
+    visit_variant : 'state De_base.ctx -> ('value, error) result;
+  }
+
+  let default =
+    De_base.
+      {
+        visit_string = (fun _ctx _str -> Error `unimplemented);
+        visit_variant = (fun _ctx -> Error `unimplemented);
+      }
+
+  let visit_variant ctx t = t.visit_variant ctx
+  let visit_string ctx t str = t.visit_string ctx str
 end
 
 module De = struct
   include De_base
 
-  let rec pp fmt t =
-    match t with
-    | Variant { var_name; var_cstrs } ->
-        Format.fprintf fmt "(Variant {var_name=%S;var_cstrs=" var_name;
-        (pp_list pp_cstr) fmt var_cstrs;
-        Format.fprintf fmt "})"
+  let deserialize_variant (type state) (((module D), state) as ctx : state ctx)
+      ~visitor ~name ~variants =
+    D.deserialize_variant ctx state visitor ~name ~variants
 
-  and pp_cstr fmt cstr =
-    match cstr with
-    | Cstr_unit { ucstr_name; _ } ->
-        Format.fprintf fmt "(Cstr_unit {ucstr_name=%S; ucstr_val=_})" ucstr_name
-    | Cstr_args { cstr_name; _ } ->
-        Format.fprintf fmt
-          "(Cstr_args {cstr_name=%S; cstr_fn=(fun _ser -> Error \
-           `unimplemented)})"
-          cstr_name
+  let deserialize_identifier (type state)
+      (((module D), state) as ctx : state ctx) visitor =
+    D.deserialize_identifier ctx state visitor
 
-  let variant var_name var_cstrs = Variant { var_name; var_cstrs }
+  let deserialize_string (type state) (((module D), state) as ctx : state ctx)
+      visitor =
+    D.deserialize_string ctx state visitor
 
-  let unit_constructor ucstr_name ucstr_val =
-    Cstr_unit { ucstr_name; ucstr_val }
+  let variant ctx name variants visit_variant =
+    let visitor = { Visitor.default with visit_variant } in
+    deserialize_variant ctx ~visitor ~name ~variants
 
-  let constructor cstr_name cstr_fn =
-    Cstr_args { cstr_name; cstr_fn = Chain.run cstr_fn }
+  let identifier ctx visitor = deserialize_identifier ctx visitor
+end
 
-  let arg arg cstr =
-    match cstr with
-    | Cstr_unit _ -> failwith "Cannot add arguments to unit constructor"
-    | Cstr_args { cstr_name; cstr_fn } ->
-        Cstr_args { cstr_name; cstr_fn = Chain.chain arg cstr_fn }
+module Serializer = struct
+  type ('state, 'output) t = ('state, 'output) Ser.serializer
 
-  let int (type input)
-      (config, (module De : Intf with type input = input), (input : input)) =
-    let* int = De.deserialize_int config input in
-    Ok int
+  module type Intf = Ser.Serializer
 
-  let string (type input)
-      (config, (module De : Intf with type input = input), (input : input)) =
-    let* string = De.deserialize_string config input in
-    Ok string
+  module Default = struct end
 end
 
 module Deserializer = struct
-  module type Intf = De_base.Intf
+  type 'state t = 'state De.deserializer
+
+  module type Intf = De.Deserializer
+
+  module Default = struct end
 end
 
-type 'src deserializer = (module Deserializer.Intf with type input = 'src)
+let serialize :
+    type value state output.
+    (state, output) Serializer.t ->
+    state ->
+    (value, state, output) Ser.t ->
+    value ->
+    (output, error) result =
+ fun fmt ctx (Serialize ser as self) value -> ser (self, fmt, ctx) value
 
 let deserialize :
-    type src value.
-    ?config:Config.t ->
-    src deserializer ->
-    (src, (value, error) result) De.t ->
-    src ->
+    type value state output.
+    state Deserializer.t ->
+    state ->
+    (value, state) De.t ->
     (value, error) result =
- fun ?(config = Config.default) fmt shape input ->
-  let (module Fmt) = fmt in
-  match shape with De.Variant v -> Fmt.deserialize_variant config fmt v input
+ fun fmt ctx (Deserialize de) -> de (fmt, ctx)

@@ -2,12 +2,12 @@ open Serde
 
 type rank = Captain | Chief_petty_officer
 
-let serialize_rank rank =
+let serialize_rank =
   Ser.(
-    variant "rank"
-      (match rank with
-      | Captain -> constructor "Captain" []
-      | Chief_petty_officer -> constructor "Chief_petty_officer" []))
+    serializer @@ fun ctx rank ->
+    match rank with
+    | Captain -> variant ctx "rank" 0 "Captain" 0
+    | Chief_petty_officer -> variant ctx "rank" 0 "Chief_petty_officer" 0)
 
 (* let deserialize_rank = *)
 (*   De.( *)
