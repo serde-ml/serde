@@ -6,7 +6,7 @@ let error fmt = Spices.(default |> fg (color "#FF0000") |> build) fmt
 
 type simple_variant = A
 type variant_with_arg = B of int
-(* type variant_with_many_args = C of int * string *)
+type variant_with_many_args = C of int * string
 (* type record = { name : string; year : int [@warning "-69"] } *)
 (* type variant_with_inline_record = D of { is_inline : bool } *)
 (* type nested = { nested_flag : bool } *)
@@ -15,8 +15,9 @@ type variant_with_arg = B of int
 let pp_variant fmt A = Format.fprintf fmt "A"
 let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i;;
 
-(* let pp_variant_with_many_arg fmt (C (i, str)) = *)
-(*   Format.fprintf fmt "(C (%d, %S))" i str *)
+let pp_variant_with_many_arg fmt (C (i, str)) =
+  Format.fprintf fmt "(C (%d, %S))" i str
+;;
 
 (* let pp_record fmt { name; year } = *)
 (*   Format.fprintf fmt "{name=%S;year=%d}" name year *)
@@ -135,7 +136,6 @@ let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i;;
 (*       ]) *)
 (*   {| { "C": [2112, "rush"] } |} *)
 (*   (C (2112, "rush")); *)
-()
 
 let _serde_json_roundtrip_tests =
   let test str pp ser de value expect_str =
@@ -204,6 +204,7 @@ let _serde_json_roundtrip_tests =
     Ser.(
       serializer @@ fun ctx (B i) ->
       newtype_variant ctx "simple_variant" 0 "B" (int i))
+
     De.(
       deserializer @@ fun ctx ->
       let field_visitor =
@@ -218,26 +219,65 @@ let _serde_json_roundtrip_tests =
 
       variant ctx "simple_variant" [ "B" ] @@ fun ctx ->
       let* `B = identifier ctx field_visitor in
-      (* let* i = newtype_variant ctx int in *)
-      let i = 9 in
-      Ok (B i))
-    (B 2112) "A"
+      newtype_variant ctx @@ fun ctx -> 
+        let* i = int ctx in
+        Ok (B i))
+    (B 2112) "(B 2112)"
+    ;
 
-(*   test "variant_with_one_arg" pp_variant_with_arg *)
-(*     Ser.(fun (B i) -> variant "variant" (constructor "B" [ int i ])) *)
-(*     De.(variant "variant" [ constructor "B" (fun i -> Ok (B i)) |> arg int ]) *)
-(*     (B 2112); *)
+  test "variant with one arg and wrong serialization" pp_variant_with_arg
+    Ser.(
+      serializer @@ fun ctx (B i) ->
+      newtype_variant ctx "simple_variant" 0 "Wrong_variant" (int i))
+    De.(
+      deserializer @@ fun ctx ->
+      let field_visitor =
+        Visitor.
+          {
+            default with
+            visit_string =
+              (fun _ctx str ->
+                match str with "B" -> Ok `B | _ -> Error `invalid_tag);
+          }
+      in
 
-(*   test "variant_with_many_args" pp_variant_with_many_arg *)
-(*     Ser.( *)
-(*       fun (C (i, s)) -> variant "variant" (constructor "C" [ int i; string s ])) *)
-(*     De.( *)
-(*       variant "variant" *)
-(*         [ *)
-(*           constructor "C" (fun str i -> Ok (C (i, str))) *)
-(*           |> arg string |> arg int; *)
-(*         ]) *)
-(*     (C (2112, "rush")); *)
+      variant ctx "simple_variant" [ "B" ] @@ fun ctx ->
+      let* `B = identifier ctx field_visitor in
+      newtype_variant ctx @@ fun ctx -> 
+        let* i = int ctx in
+        Ok (B i))
+    (B 2112) "Exception: invalid_tag"
+    ;
+
+  test "variant with many args" pp_variant_with_many_arg
+    Ser.(
+      serializer @@ fun ctx (C (i, str)) ->
+        tuple_variant ctx "variant_with_many_args" 0 "C" 2
+        @@ (fun ctx ->
+          let* () = field ctx (int i) in
+          let* () = field ctx (string str) in
+          Ok ()
+        ))
+    De.(
+      deserializer @@ fun ctx ->
+      let field_visitor =
+        Visitor.
+          {
+            default with
+            visit_string =
+              (fun _ctx str ->
+                match str with "C" -> Ok `C | _ -> Error `invalid_tag);
+          }
+      in
+
+      variant ctx "variant_with_many_args" [ "C" ] @@ fun ctx ->
+      let* `C = identifier ctx field_visitor in
+      tuple_variant ctx 2 @@ fun ctx -> 
+        let* i = field ctx int in
+        let* str = field ctx string in
+         Ok (C (i, str)))
+    (C (2112, "rush")) {|(C (2112, "rush"))|}
+    ;
 
 (*   test "record_with_one_arg" pp_record *)
 (*     Ser.( *)
