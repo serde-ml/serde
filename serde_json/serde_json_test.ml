@@ -11,7 +11,7 @@ type simple_record = { name : string; year : int [@warning "-69"] }
 type variant_with_inline_record = D of { is_inline : bool }
 type nested = { nested_flag : bool }
 type record_nested = { nested : nested }
-(* type with_option = string option *)
+type with_option = string option
 (* type with_nested_option = { nested_opt: with_option } *)
 (* type with_list = { users: string list } *)
 
@@ -29,6 +29,11 @@ let pp_variant_with_inline_record fmt (D { is_inline }) =
 
 let pp_record_nested fmt { nested = { nested_flag } } =
   Format.fprintf fmt "({nested={nested_flag=%b}})" nested_flag
+
+let pp_with_option fmt opt =
+  match opt with
+  | None -> Format.fprintf fmt "None"
+  | Some s -> Format.fprintf fmt "(Some %S)" s
 
 (* let _serde_json_serializer_test = *)
 (*   let test str ser value expected = *)
@@ -324,7 +329,7 @@ let _serde_json_roundtrip_tests =
     (D { is_inline = true })
     {|(D {is_inline=true})|};
 
-  test "record_with_one_arg" pp_record_nested
+  test "record_with_nested_records" pp_record_nested
     Ser.(
       let nested_serializer =
         serializer @@ fun nr ctx ->
@@ -347,5 +352,30 @@ let _serde_json_roundtrip_tests =
       Ok { nested })
     { nested = { nested_flag = false } }
     {|({nested={nested_flag=false}})|};
+
+  test "option/none" pp_with_option
+    Ser.(serializer @@ fun opt ctx ->
+    option string opt ctx )
+    De.(
+      deserializer @@ fun ctx ->
+      option ctx @@ fun ctx -> 
+        let* str = string ctx in
+        Ok (Some str)
+    )
+    (Some "rush" : with_option)
+    {|(Some "rush")|};
+
+  test "option/none" pp_with_option
+    Ser.(serializer @@ fun opt ctx ->
+    option string opt ctx )
+    De.(
+      deserializer @@ fun ctx ->
+      option ctx @@ fun ctx -> 
+        let* str = string ctx in
+        Ok (Some str)
+    )
+    None
+    {|None|};
+
 
   ()

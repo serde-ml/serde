@@ -57,6 +57,14 @@ module rec Ser_base : sig
     val serialize_string :
       ('value, state, output) ctx -> state -> string -> (output, error) result
 
+    val serialize_none :
+      ('value, state, output) ctx -> state -> (output, error) result
+
+    val serialize_some :
+      ('value, state, output) ctx -> state -> 
+      (('value, state, output) ctx -> (output, error) result) 
+        -> (output, error) result
+
     val serialize_sequence :
       ('value, state, output) ctx ->
       state ->
@@ -151,6 +159,14 @@ end = struct
 
     val serialize_string :
       ('value, state, output) ctx -> state -> string -> (output, error) result
+
+    val serialize_none :
+      ('value, state, output) ctx -> state -> (output, error) result
+
+    val serialize_some :
+      ('value, state, output) ctx -> state -> 
+      (('value, state, output) ctx -> (output, error) result) 
+        -> (output, error) result
 
     val serialize_sequence :
       ('value, state, output) ctx ->
@@ -286,6 +302,12 @@ module Ser = struct
       (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
     S.serialize_string self state string
 
+  let option (type value state output) ser value
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
+    match value with
+    | None -> S.serialize_none self state
+    | Some s -> S.serialize_some self state (fun ctx -> ser s ctx)
+
   let s :
       type value value2 state output.
       (value, state, output) t ->
@@ -293,7 +315,7 @@ module Ser = struct
       (value2, state, output) ctx ->
       (output, error) result =
    fun ser value (Ctx (_self, (module S), state)) ->
-     let state = S.nest state in
+    let state = S.nest state in
     ser value (Ctx (ser, (module S), state))
 end
 
@@ -376,6 +398,7 @@ module rec De_base : sig
     val deserialize_string : state ctx -> state -> (string, error) result
     val deserialize_int : state ctx -> state -> (int, error) result
     val deserialize_bool : state ctx -> state -> (bool, error) result
+    val deserialize_option : state ctx -> state -> ('value option, state) t -> ('value option, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -395,6 +418,7 @@ end = struct
     type state
 
     val nest : state -> state
+
     val deserialize_sequence :
       state ctx ->
       state ->
@@ -456,6 +480,7 @@ end = struct
     val deserialize_string : state ctx -> state -> (string, error) result
     val deserialize_int : state ctx -> state -> (int, error) result
     val deserialize_bool : state ctx -> state -> (bool, error) result
+    val deserialize_option : state ctx -> state -> ('value option, state) t -> ('value option, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -535,6 +560,9 @@ module De = struct
   let deserialize_string (type state) (((module D), state) as ctx : state ctx) =
     D.deserialize_string ctx state
 
+  let deserialize_option (type state) (((module D), state) as ctx : state ctx) de =
+    D.deserialize_option ctx state de
+
   let record ctx name size de = deserialize_record ctx name size de
 
   let variant ctx name variants visit_variant =
@@ -551,8 +579,9 @@ module De = struct
   let record_variant ctx size de = deserialize_record_variant ctx size de
   let element ctx de = deserialize_element ctx de
   let field ctx name de = deserialize_field ctx name de
+  let option ctx de = deserialize_option ctx de
 
-  let d (type state) de (((module D) as self, state) : state ctx)=
+  let d (type state) de ((((module D) as self), state) : state ctx) =
     let state = D.nest state in
     de (self, state)
 end

@@ -70,6 +70,9 @@ module Json = struct
     let read_null_if_possible { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_null_if_possible yojson lexbuf)
 
+    let read_null { yojson; lexbuf } =
+      _run (fun () -> Yojson.Safe.read_null yojson lexbuf)
+
     let read_object_start { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_lcurl yojson lexbuf)
 
@@ -110,6 +113,7 @@ module Fmt = struct
   let end_object_key _w = Ok ()
   let begin_object_value w = write w ":"
   let end_object_value _w = Ok ()
+  let null w = write w "null"
 end
 
 module Serializer = struct
@@ -127,6 +131,9 @@ module Serializer = struct
 
   let serialize_int _self (S { fmt; _ }) int =
     Rio.write_all fmt ~buf:(Int.to_string int)
+
+  let serialize_none _self (S { fmt; _ }) = Fmt.null fmt
+  let serialize_some self _state value = Ser.serialize self value
 
   let serialize_sequence self (S ({ fmt; _ } as state)) ~size elements =
     state.kind <- First;
@@ -203,6 +210,13 @@ module Deserializer = struct
   let deserialize_int _self state = Parser.read_int state.reader
   let deserialize_bool _self state = Parser.read_bool state.reader
   let deserialize_string _self state = Parser.read_string state.reader
+
+  let deserialize_option self { reader; _ } de =
+    match Parser.peek reader with
+    | Some 'n' ->
+        let* () = Parser.read_null reader in
+        Ok None
+    | _ -> De.deserialize self de
 
   let deserialize_identifier self _state visitor =
     let* str = De.deserialize_string self in
