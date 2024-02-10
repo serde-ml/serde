@@ -114,9 +114,7 @@ end
 
 module Serializer = struct
   type output = unit
-
   type kind = First | Rest
-
   type state = S : { fmt : 'w Rio.Writer.t; mutable kind : kind } -> state
 
   let serialize_string _self (S { fmt; _ }) string =
@@ -125,22 +123,22 @@ module Serializer = struct
   let serialize_int _self (S { fmt; _ }) int =
     Rio.write_all fmt ~buf:(Int.to_string int)
 
-  let serialize_sequence self (S({ fmt; _} as state)) ~size elements = 
+  let serialize_sequence self (S ({ fmt; _ } as state)) ~size elements =
     state.kind <- First;
     let* () = Fmt.begin_array fmt in
     let* () = if size = 0 then Ok () else Ser.serialize self elements in
     Fmt.end_array fmt
 
-  let serialize_element self (S s) elements = 
+  let serialize_element self (S s) elements =
     let* () = if s.kind = First then Ok () else Fmt.comma s.fmt in
     s.kind <- Rest;
     Ser.serialize self elements
 
-  let serialize_unit_variant _self (S { fmt;_ }) ~var_type:_ ~cstr_idx:_
+  let serialize_unit_variant _self (S { fmt; _ }) ~var_type:_ ~cstr_idx:_
       ~cstr_name =
     Rio.write_all fmt ~buf:(Format.sprintf "%S" cstr_name)
 
-  let serialize_tuple_variant self (S { fmt;_ }) ~var_type:_ ~cstr_idx:_
+  let serialize_tuple_variant self (S { fmt; _ }) ~var_type:_ ~cstr_idx:_
       ~cstr_name ~size values =
     let* () = Fmt.begin_object fmt in
     let* () = Fmt.begin_object_key ~first:true fmt in
@@ -151,7 +149,7 @@ module Serializer = struct
     let* () = Fmt.end_object_value fmt in
     Fmt.end_object fmt
 
-  let serialize_newtype_variant self (S { fmt;_ }) ~var_type:_ ~cstr_idx:_
+  let serialize_newtype_variant self (S { fmt; _ }) ~var_type:_ ~cstr_idx:_
       ~cstr_name field =
     let* () = Fmt.begin_object fmt in
     let* () = Fmt.begin_object_key ~first:true fmt in
@@ -161,6 +159,22 @@ module Serializer = struct
     let* () = Ser.serialize self field in
     let* () = Fmt.end_object_value fmt in
     Fmt.end_object fmt
+
+  let serialize_record self (S { fmt; _ }) ~rec_type:_ ~size:_ values =
+    let* () = Fmt.begin_object fmt in
+    let* () = Ser.serialize self values in
+    Fmt.end_object fmt
+
+  let serialize_field self (S s) ~name values =
+    let first = if s.kind = First then true else false in
+    s.kind <- Rest;
+    let* () = Fmt.begin_object_key ~first s.fmt in
+    let* () = Rio.write_all s.fmt ~buf:(Format.sprintf "%S" name) in
+    let* () = Fmt.end_object_key s.fmt in
+    let* () = Fmt.begin_object_value s.fmt in
+    let* () = Ser.serialize self values in
+    let* () = Fmt.end_object_value s.fmt in
+    Ok ()
 end
 
 module Deserializer = struct
@@ -169,58 +183,77 @@ module Deserializer = struct
   type kind = First | Rest
   type state = { reader : Parser.t; mutable kind : kind }
 
-  let deserialize_int _self state =
-    Parser.read_int state.reader
-
-  let deserialize_string _self state =
-    Parser.read_string state.reader
+  let deserialize_int _self state = Parser.read_int state.reader
+  let deserialize_string _self state = Parser.read_string state.reader
 
   let deserialize_identifier self _state visitor =
-    let*str = De.deserialize_string self in
+    let* str = De.deserialize_string self in
     Visitor.visit_string self visitor str
 
-  let deserialize_sequence self s ~size:_ de = 
+  let deserialize_sequence self s ~size:_ de =
     let* () = Parser.read_open_bracket s.reader in
     let* v = De.deserialize self de in
     let* () = Parser.read_close_bracket s.reader in
     Ok v
 
-  let deserialize_element self s de = 
+  let deserialize_element self s de =
     let* () = if s.kind = First then Ok () else Parser.read_comma s.reader in
     s.kind <- Rest;
     De.deserialize self de
 
   let deserialize_unit_variant _self _state = Ok ()
 
-  let deserialize_newtype_variant self {reader;_} de =
+  let deserialize_newtype_variant self { reader; _ } de =
     let* () = Parser.read_colon reader in
     De.deserialize self de
 
-  let deserialize_tuple_variant self {reader;_} ~size de =
+  let deserialize_tuple_variant self { reader; _ } ~size de =
     let* () = Parser.read_colon reader in
     De.deserialize_sequence self size de
 
-  let deserialize_variant self {reader;_} visitor ~name:_ ~variants:_ =
+  let deserialize_variant self { reader; _ } visitor ~name:_ ~variants:_ =
     Parser.skip_space reader;
     match Parser.peek reader with
-    | Some '{' -> 
-        let* () = Parser.read_object_start reader in 
+    | Some '{' ->
+        let* () = Parser.read_object_start reader in
         Parser.skip_space reader;
         let* value = Visitor.visit_variant self visitor in
         Parser.skip_space reader;
-        let* () = Parser.read_object_end reader in 
+        let* () = Parser.read_object_end reader in
         Ok value
-
     | Some '"' -> Visitor.visit_variant self visitor
     | _ -> assert false
+
+  let deserialize_record self { reader; _ } ~name:_ ~size:_ fields =
+    Parser.skip_space reader;
+    match Parser.peek reader with
+    | Some '{' ->
+        let* () = Parser.read_object_start reader in
+        Parser.skip_space reader;
+        let* value = De.deserialize self fields in
+        Parser.skip_space reader;
+        let* () = Parser.read_object_end reader in
+        Ok value
+    | _ -> assert false
+
+  let deserialize_field self s ~name de =
+    let* () = if s.kind = First then Ok () else Parser.read_comma s.reader in
+    s.kind <- Rest;
+    let* field_name = Parser.read_string s.reader in
+    if String.equal field_name name then
+      let* () = Parser.read_colon s.reader in
+      De.deserialize self de
+    else Error `invalid_field_type
 end
 
 let to_string ser value =
   let buf = Buffer.create 0 in
-  let state = Serializer.S { fmt = Rio.Buffer.to_writer buf ; kind = First} in
+  let state = Serializer.S { fmt = Rio.Buffer.to_writer buf; kind = First } in
   let* () = Serde.serialize (module Serializer) state ser value in
   Ok (Buffer.to_bytes buf |> Bytes.unsafe_to_string)
 
 let of_string de string =
-  let state = Deserializer.{ reader = Json.Parser.of_string string; kind = First } in
+  let state =
+    Deserializer.{ reader = Json.Parser.of_string string; kind = First }
+  in
   Serde.deserialize (module Deserializer) state de

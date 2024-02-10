@@ -92,6 +92,21 @@ module rec Ser_base : sig
       size:int ->
       (('value, state, output) ctx -> (output, error) result) ->
       (output, error) result
+
+    val serialize_record :
+      ('value, state, output) ctx ->
+      state ->
+      rec_type:string ->
+      size:int ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
+
+    val serialize_field :
+      ('value, state, output) ctx ->
+      state ->
+      name:string ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
   end
 
   type ('state, 'output) serializer =
@@ -157,6 +172,21 @@ end = struct
       size:int ->
       (('value, state, output) ctx -> (output, error) result) ->
       (output, error) result
+
+    val serialize_record :
+      ('value, state, output) ctx ->
+      state ->
+      rec_type:string ->
+      size:int ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
+
+    val serialize_field :
+      ('value, state, output) ctx ->
+      state ->
+      name:string ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
   end
 
   type ('state, 'output) serializer =
@@ -191,9 +221,18 @@ module Ser = struct
       cstr_idx cstr_name size =
     S.serialize_tuple_variant ctx state ~var_type ~cstr_idx ~cstr_name ~size
 
-  let field (type value state output)
+  let record (type value state output)
+      ((_, (module S), state) as ctx : (value, state, output) ctx) rec_type size
+      =
+    S.serialize_record ctx state ~rec_type ~size
+
+  let element (type value state output)
       ((_, (module S), state) as ctx : (value, state, output) ctx) value =
     S.serialize_element ctx state value
+
+  let field (type value state output)
+      ((_, (module S), state) as ctx : (value, state, output) ctx) name value =
+    S.serialize_field ctx state ~name value
 
   let int (type value state output) int
       ((_, (module S), state) as self : (value, state, output) ctx) =
@@ -247,6 +286,21 @@ module rec De_base : sig
       state ctx ->
       state ->
       size:int ->
+      ('value, state) t ->
+      ('value, error) result
+
+    val deserialize_record :
+      state ctx ->
+      state ->
+      name:string ->
+      size:int ->
+      ('value, state) t ->
+      ('value, error) result
+
+    val deserialize_field :
+      state ctx ->
+      state ->
+      name:string ->
       ('value, state) t ->
       ('value, error) result
 
@@ -306,6 +360,21 @@ end = struct
       ('value, state) t ->
       ('value, error) result
 
+    val deserialize_record :
+      state ctx ->
+      state ->
+      name:string ->
+      size:int ->
+      ('value, state) t ->
+      ('value, error) result
+
+    val deserialize_field :
+      state ctx ->
+      state ->
+      name:string ->
+      ('value, state) t ->
+      ('value, error) result
+
     val deserialize_identifier :
       state ctx ->
       state ->
@@ -347,12 +416,20 @@ module De = struct
   let deserialize_int (type state) (((module D), state) as ctx : state ctx) =
     D.deserialize_int ctx state
 
+  let deserialize_record (type state) (((module D), state) as ctx : state ctx)
+      name size de =
+    D.deserialize_record ctx state ~name ~size de
+
+  let deserialize_field (type state) (((module D), state) as ctx : state ctx)
+      name de =
+    D.deserialize_field ctx state ~name de
+
   let deserialize_sequence (type state) (((module D), state) as ctx : state ctx)
       size de =
     D.deserialize_sequence ctx state ~size de
 
-  let deserialize_field (type state) (((module D), state) as ctx : state ctx) de
-      =
+  let deserialize_element (type state) (((module D), state) as ctx : state ctx)
+      de =
     D.deserialize_element ctx state de
 
   let deserialize_variant (type state) (((module D), state) as ctx : state ctx)
@@ -378,6 +455,8 @@ module De = struct
   let deserialize_string (type state) (((module D), state) as ctx : state ctx) =
     D.deserialize_string ctx state
 
+  let record ctx name size de = deserialize_record ctx name size de
+
   let variant ctx name variants visit_variant =
     let visitor = { Visitor.default with visit_variant } in
     deserialize_variant ctx ~visitor ~name ~variants
@@ -388,7 +467,8 @@ module De = struct
   let unit_variant ctx = deserialize_unit_variant ctx
   let newtype_variant ctx de = deserialize_newtype_variant ctx de
   let tuple_variant ctx size de = deserialize_tuple_variant ctx size de
-  let field ctx de = deserialize_field ctx de
+  let element ctx de = deserialize_element ctx de
+  let field ctx name de = deserialize_field ctx name de
 end
 
 module Serializer = struct

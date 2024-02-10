@@ -7,20 +7,19 @@ let error fmt = Spices.(default |> fg (color "#FF0000") |> build) fmt
 type simple_variant = A
 type variant_with_arg = B of int
 type variant_with_many_args = C of int * string
-(* type record = { name : string; year : int [@warning "-69"] } *)
+type simple_record = { name : string; year : int [@warning "-69"] }
 (* type variant_with_inline_record = D of { is_inline : bool } *)
 (* type nested = { nested_flag : bool } *)
 (* type record_nested = { nested : nested } *)
 
 let pp_variant fmt A = Format.fprintf fmt "A"
-let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i;;
+let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i
 
 let pp_variant_with_many_arg fmt (C (i, str)) =
   Format.fprintf fmt "(C (%d, %S))" i str
-;;
 
-(* let pp_record fmt { name; year } = *)
-(*   Format.fprintf fmt "{name=%S;year=%d}" name year *)
+let pp_record fmt { name; year } =
+  Format.fprintf fmt "{name=%S;year=%d}" name year
 
 (* let _serde_json_serializer_test = *)
 (*   let test str ser value expected = *)
@@ -204,7 +203,6 @@ let _serde_json_roundtrip_tests =
     Ser.(
       serializer @@ fun ctx (B i) ->
       newtype_variant ctx "simple_variant" 0 "B" (int i))
-
     De.(
       deserializer @@ fun ctx ->
       let field_visitor =
@@ -219,11 +217,10 @@ let _serde_json_roundtrip_tests =
 
       variant ctx "simple_variant" [ "B" ] @@ fun ctx ->
       let* `B = identifier ctx field_visitor in
-      newtype_variant ctx @@ fun ctx -> 
-        let* i = int ctx in
-        Ok (B i))
-    (B 2112) "(B 2112)"
-    ;
+      newtype_variant ctx @@ fun ctx ->
+      let* i = int ctx in
+      Ok (B i))
+    (B 2112) "(B 2112)";
 
   test "variant with one arg and wrong serialization" pp_variant_with_arg
     Ser.(
@@ -243,21 +240,18 @@ let _serde_json_roundtrip_tests =
 
       variant ctx "simple_variant" [ "B" ] @@ fun ctx ->
       let* `B = identifier ctx field_visitor in
-      newtype_variant ctx @@ fun ctx -> 
-        let* i = int ctx in
-        Ok (B i))
-    (B 2112) "Exception: invalid_tag"
-    ;
+      newtype_variant ctx @@ fun ctx ->
+      let* i = int ctx in
+      Ok (B i))
+    (B 2112) "Exception: invalid_tag";
 
   test "variant with many args" pp_variant_with_many_arg
     Ser.(
       serializer @@ fun ctx (C (i, str)) ->
-        tuple_variant ctx "variant_with_many_args" 0 "C" 2
-        @@ (fun ctx ->
-          let* () = field ctx (int i) in
-          let* () = field ctx (string str) in
-          Ok ()
-        ))
+      tuple_variant ctx "variant_with_many_args" 0 "C" 2 @@ fun ctx ->
+      let* () = element ctx (int i) in
+      let* () = element ctx (string str) in
+      Ok ())
     De.(
       deserializer @@ fun ctx ->
       let field_visitor =
@@ -272,23 +266,27 @@ let _serde_json_roundtrip_tests =
 
       variant ctx "variant_with_many_args" [ "C" ] @@ fun ctx ->
       let* `C = identifier ctx field_visitor in
-      tuple_variant ctx 2 @@ fun ctx -> 
-        let* i = field ctx int in
-        let* str = field ctx string in
-         Ok (C (i, str)))
-    (C (2112, "rush")) {|(C (2112, "rush"))|}
-    ;
+      tuple_variant ctx 2 @@ fun ctx ->
+      let* i = element ctx int in
+      let* str = element ctx string in
+      Ok (C (i, str)))
+    (C (2112, "rush"))
+    {|(C (2112, "rush"))|};
 
-(*   test "record_with_one_arg" pp_record *)
-(*     Ser.( *)
-(*       record "record" (fun ctx r -> *)
-(*           let* () = field ctx "name" (string r.name) in *)
-(*           field ctx "year" (int r.year))) *)
-(*     De.( *)
-(*       record "record" (fun ctx -> *)
-(*           let* name = field ctx "name" string in *)
-(*           let* year = field ctx "year" int in *)
-(*           Ok { name; year })) *)
-(*     { name = "rush"; year = 2112 }; *)
+  test "record_with_one_arg" pp_record
+    Ser.(
+      serializer @@ fun ctx r ->
+      record ctx "simple_record" 2 @@ fun ctx ->
+      let* () = field ctx "name" (string r.name) in
+      let* () = field ctx "year" (int r.year) in
+      Ok ())
+    De.(
+      deserializer @@ fun ctx ->
+      record ctx "record" 2 @@ fun ctx ->
+      let* name = field ctx "name" string in
+      let* year = field ctx "year" int in
+      Ok { name; year })
+    { name = "rush"; year = 2112 }
+    {|{name="rush";year=2112}|};
 
-(*   () *)
+  ()
