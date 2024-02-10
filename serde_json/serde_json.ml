@@ -117,6 +117,11 @@ module Serializer = struct
   type kind = First | Rest
   type state = S : { fmt : 'w Rio.Writer.t; mutable kind : kind } -> state
 
+  let nest (S { fmt; _ }) = S { fmt; kind = First }
+
+  let serialize_bool _self (S { fmt; _ }) bool =
+    Rio.write_all fmt ~buf:(Bool.to_string bool)
+
   let serialize_string _self (S { fmt; _ }) string =
     Rio.write_all fmt ~buf:(Format.sprintf "%S" string)
 
@@ -146,6 +151,17 @@ module Serializer = struct
     let* () = Fmt.end_object_key fmt in
     let* () = Fmt.begin_object_value fmt in
     let* () = Ser.serialize_sequence self size values in
+    let* () = Fmt.end_object_value fmt in
+    Fmt.end_object fmt
+
+  let serialize_record_variant self (S { fmt; _ }) ~var_type:_ ~cstr_idx:_
+      ~cstr_name ~size values =
+    let* () = Fmt.begin_object fmt in
+    let* () = Fmt.begin_object_key ~first:true fmt in
+    let* () = Rio.write_all fmt ~buf:(Format.sprintf "%S" cstr_name) in
+    let* () = Fmt.end_object_key fmt in
+    let* () = Fmt.begin_object_value fmt in
+    let* () = Ser.serialize_record self "" size values in
     let* () = Fmt.end_object_value fmt in
     Fmt.end_object fmt
 
@@ -183,7 +199,9 @@ module Deserializer = struct
   type kind = First | Rest
   type state = { reader : Parser.t; mutable kind : kind }
 
+  let nest { reader; _ } = { reader; kind = First }
   let deserialize_int _self state = Parser.read_int state.reader
+  let deserialize_bool _self state = Parser.read_bool state.reader
   let deserialize_string _self state = Parser.read_string state.reader
 
   let deserialize_identifier self _state visitor =
@@ -210,6 +228,10 @@ module Deserializer = struct
   let deserialize_tuple_variant self { reader; _ } ~size de =
     let* () = Parser.read_colon reader in
     De.deserialize_sequence self size de
+
+  let deserialize_record_variant self { reader; _ } ~size de =
+    let* () = Parser.read_colon reader in
+    De.deserialize_record self "" size de
 
   let deserialize_variant self { reader; _ } visitor ~name:_ ~variants:_ =
     Parser.skip_space reader;

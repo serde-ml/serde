@@ -31,21 +31,25 @@ module Config = struct
 end
 
 module rec Ser_base : sig
-  type ('value, 'state, 'output) ser_fn =
-    ('value, 'state, 'output) ctx -> 'value -> ('output, error) result
-
-  and ('value, 'state, 'output) t =
-    | Serialize of ('value, 'state, 'output) ser_fn
+  type ('value, 'state, 'output) t =
+    'value -> ('value, 'state, 'output) ctx -> ('output, error) result
 
   and ('value, 'state, 'output) ctx =
-    ('value, 'state, 'output) t * ('state, 'output) Ser_base.serializer * 'state
+    | Ctx of
+        ('value, 'state, 'output) t
+        * ('state, 'output) Ser_base.serializer
+        * 'state
 
-  val serializer :
-    ('value, 'state, 'output) ser_fn -> ('value, 'state, 'output) t
+  val serializer : ('value, 'state, 'output) t -> ('value, 'state, 'output) t
 
   module type Serializer = sig
     type output
     type state
+
+    val nest : state -> state
+
+    val serialize_bool :
+      ('value, state, output) ctx -> state -> bool -> (output, error) result
 
     val serialize_int :
       ('value, state, output) ctx -> state -> int -> (output, error) result
@@ -84,6 +88,16 @@ module rec Ser_base : sig
       (output, error) result
 
     val serialize_tuple_variant :
+      ('value, state, output) ctx ->
+      state ->
+      var_type:string ->
+      cstr_idx:int ->
+      cstr_name:string ->
+      size:int ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
+
+    val serialize_record_variant :
       ('value, state, output) ctx ->
       state ->
       var_type:string ->
@@ -112,20 +126,25 @@ module rec Ser_base : sig
   type ('state, 'output) serializer =
     (module Serializer with type output = 'output and type state = 'state)
 end = struct
-  type ('value, 'state, 'output) ser_fn =
-    ('value, 'state, 'output) ctx -> 'value -> ('output, error) result
-
-  and ('value, 'state, 'output) t =
-    | Serialize of ('value, 'state, 'output) ser_fn
+  type ('value, 'state, 'output) t =
+    'value -> ('value, 'state, 'output) ctx -> ('output, error) result
 
   and ('value, 'state, 'output) ctx =
-    ('value, 'state, 'output) t * ('state, 'output) Ser_base.serializer * 'state
+    | Ctx of
+        ('value, 'state, 'output) t
+        * ('state, 'output) Ser_base.serializer
+        * 'state
 
-  let serializer fn = Serialize fn
+  let serializer fn = fn
 
   module type Serializer = sig
     type output
     type state
+
+    val nest : state -> state
+
+    val serialize_bool :
+      ('value, state, output) ctx -> state -> bool -> (output, error) result
 
     val serialize_int :
       ('value, state, output) ctx -> state -> int -> (output, error) result
@@ -164,6 +183,16 @@ end = struct
       (output, error) result
 
     val serialize_tuple_variant :
+      ('value, state, output) ctx ->
+      state ->
+      var_type:string ->
+      cstr_idx:int ->
+      cstr_name:string ->
+      size:int ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
+
+    val serialize_record_variant :
       ('value, state, output) ctx ->
       state ->
       var_type:string ->
@@ -202,45 +231,70 @@ module Ser = struct
     ser ctx
 
   let serialize_sequence (type value state output)
-      ((_, (module S), state) as self : (value, state, output) ctx) size
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) size
       elements =
     S.serialize_sequence self state ~size elements
 
+  let serialize_record (type value state output)
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) rec_type
+      size fields =
+    S.serialize_record self state ~rec_type ~size fields
+
   let unit_variant (type value state output)
-      ((_, (module S), state) as self : (value, state, output) ctx) var_type
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) var_type
       cstr_idx cstr_name =
     S.serialize_unit_variant self state ~var_type ~cstr_idx ~cstr_name
 
   let newtype_variant (type value state output)
-      ((_, (module S), state) as self : (value, state, output) ctx) var_type
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) var_type
       cstr_idx cstr_name value =
     S.serialize_newtype_variant self state ~var_type ~cstr_idx ~cstr_name value
 
   let tuple_variant (type value state output)
-      ((_, (module S), state) as ctx : (value, state, output) ctx) var_type
+      (Ctx (_, (module S), state) as ctx : (value, state, output) ctx) var_type
       cstr_idx cstr_name size =
     S.serialize_tuple_variant ctx state ~var_type ~cstr_idx ~cstr_name ~size
 
+  let record_variant (type value state output)
+      (Ctx (_, (module S), state) as ctx : (value, state, output) ctx) var_type
+      cstr_idx cstr_name size =
+    S.serialize_record_variant ctx state ~var_type ~cstr_idx ~cstr_name ~size
+
   let record (type value state output)
-      ((_, (module S), state) as ctx : (value, state, output) ctx) rec_type size
-      =
+      (Ctx (_, (module S), state) as ctx : (value, state, output) ctx) rec_type
+      size =
     S.serialize_record ctx state ~rec_type ~size
 
   let element (type value state output)
-      ((_, (module S), state) as ctx : (value, state, output) ctx) value =
+      (Ctx (_, (module S), state) as ctx : (value, state, output) ctx) value =
     S.serialize_element ctx state value
 
   let field (type value state output)
-      ((_, (module S), state) as ctx : (value, state, output) ctx) name value =
+      (Ctx (_, (module S), state) as ctx : (value, state, output) ctx) name
+      value =
     S.serialize_field ctx state ~name value
 
+  let bool (type value state output) bool
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
+    S.serialize_bool self state bool
+
   let int (type value state output) int
-      ((_, (module S), state) as self : (value, state, output) ctx) =
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
     S.serialize_int self state int
 
   let string (type value state output) string
-      ((_, (module S), state) as self : (value, state, output) ctx) =
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
     S.serialize_string self state string
+
+  let s :
+      type value value2 state output.
+      (value, state, output) t ->
+      value ->
+      (value2, state, output) ctx ->
+      (output, error) result =
+   fun ser value (Ctx (_self, (module S), state)) ->
+     let state = S.nest state in
+    ser value (Ctx (ser, (module S), state))
 end
 
 module rec De_base : sig
@@ -259,6 +313,8 @@ module rec De_base : sig
   module type Deserializer = sig
     type state
 
+    val nest : state -> state
+
     val deserialize_sequence :
       state ctx ->
       state ->
@@ -289,6 +345,13 @@ module rec De_base : sig
       ('value, state) t ->
       ('value, error) result
 
+    val deserialize_record_variant :
+      state ctx ->
+      state ->
+      size:int ->
+      ('value, state) t ->
+      ('value, error) result
+
     val deserialize_record :
       state ctx ->
       state ->
@@ -312,6 +375,7 @@ module rec De_base : sig
 
     val deserialize_string : state ctx -> state -> (string, error) result
     val deserialize_int : state ctx -> state -> (int, error) result
+    val deserialize_bool : state ctx -> state -> (bool, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -330,6 +394,7 @@ end = struct
   module type Deserializer = sig
     type state
 
+    val nest : state -> state
     val deserialize_sequence :
       state ctx ->
       state ->
@@ -360,6 +425,13 @@ end = struct
       ('value, state) t ->
       ('value, error) result
 
+    val deserialize_record_variant :
+      state ctx ->
+      state ->
+      size:int ->
+      ('value, state) t ->
+      ('value, error) result
+
     val deserialize_record :
       state ctx ->
       state ->
@@ -383,6 +455,7 @@ end = struct
 
     val deserialize_string : state ctx -> state -> (string, error) result
     val deserialize_int : state ctx -> state -> (int, error) result
+    val deserialize_bool : state ctx -> state -> (bool, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -416,6 +489,9 @@ module De = struct
   let deserialize_int (type state) (((module D), state) as ctx : state ctx) =
     D.deserialize_int ctx state
 
+  let deserialize_bool (type state) (((module D), state) as ctx : state ctx) =
+    D.deserialize_bool ctx state
+
   let deserialize_record (type state) (((module D), state) as ctx : state ctx)
       name size de =
     D.deserialize_record ctx state ~name ~size de
@@ -448,6 +524,10 @@ module De = struct
       (((module D), state) as ctx : state ctx) size de =
     D.deserialize_tuple_variant ctx state ~size de
 
+  let deserialize_record_variant (type state)
+      (((module D), state) as ctx : state ctx) size de =
+    D.deserialize_record_variant ctx state ~size de
+
   let deserialize_identifier (type state)
       (((module D), state) as ctx : state ctx) visitor =
     D.deserialize_identifier ctx state visitor
@@ -461,14 +541,20 @@ module De = struct
     let visitor = { Visitor.default with visit_variant } in
     deserialize_variant ctx ~visitor ~name ~variants
 
+  let bool ctx = deserialize_bool ctx
   let int ctx = deserialize_int ctx
   let string ctx = deserialize_string ctx
   let identifier ctx visitor = deserialize_identifier ctx visitor
   let unit_variant ctx = deserialize_unit_variant ctx
   let newtype_variant ctx de = deserialize_newtype_variant ctx de
   let tuple_variant ctx size de = deserialize_tuple_variant ctx size de
+  let record_variant ctx size de = deserialize_record_variant ctx size de
   let element ctx de = deserialize_element ctx de
   let field ctx name de = deserialize_field ctx name de
+
+  let d (type state) de (((module D) as self, state) : state ctx)=
+    let state = D.nest state in
+    de (self, state)
 end
 
 module Serializer = struct
@@ -494,7 +580,7 @@ let serialize :
     (value, state, output) Ser.t ->
     value ->
     (output, error) result =
- fun fmt ctx (Serialize ser as self) value -> ser (self, fmt, ctx) value
+ fun fmt ctx ser value -> ser value (Ctx (ser, fmt, ctx))
 
 let deserialize :
     type value state output.
