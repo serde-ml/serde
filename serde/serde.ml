@@ -13,6 +13,7 @@ type error =
   | `no_more_data
   | `unimplemented
   | `invalid_tag
+  | `Msg of string
   | Rio.io_error ]
 
 let pp_err fmt t =
@@ -22,6 +23,7 @@ let pp_err fmt t =
   | `no_more_data -> Format.fprintf fmt "no_more_data"
   | `unimplemented -> Format.fprintf fmt "unimplemented"
   | `invalid_tag -> Format.fprintf fmt "invalid_tag"
+  | `Msg str -> Format.fprintf fmt "%S" str
   | #Rio.io_error as err -> Rio.pp_err fmt err
 
 module Config = struct
@@ -51,11 +53,20 @@ module rec Ser_base : sig
     val serialize_bool :
       ('value, state, output) ctx -> state -> bool -> (output, error) result
 
-    val serialize_int8 : ('value, state, output) ctx -> state -> char -> (output, error) result
-    val serialize_int16 : ('value, state, output) ctx -> state -> int -> (output, error) result
-    val serialize_int31 : ('value, state, output) ctx -> state -> int -> (output, error) result
-    val serialize_int32 : ('value, state, output) ctx -> state -> int32 -> (output, error) result
-    val serialize_int64 : ('value, state, output) ctx -> state -> int64 -> (output, error) result
+    val serialize_int8 :
+      ('value, state, output) ctx -> state -> char -> (output, error) result
+
+    val serialize_int16 :
+      ('value, state, output) ctx -> state -> int -> (output, error) result
+
+    val serialize_int31 :
+      ('value, state, output) ctx -> state -> int -> (output, error) result
+
+    val serialize_int32 :
+      ('value, state, output) ctx -> state -> int32 -> (output, error) result
+
+    val serialize_int64 :
+      ('value, state, output) ctx -> state -> int64 -> (output, error) result
 
     val serialize_string :
       ('value, state, output) ctx -> state -> string -> (output, error) result
@@ -158,11 +169,20 @@ end = struct
     val serialize_bool :
       ('value, state, output) ctx -> state -> bool -> (output, error) result
 
-    val serialize_int8 : ('value, state, output) ctx -> state -> char -> (output, error) result
-    val serialize_int16 : ('value, state, output) ctx -> state -> int -> (output, error) result
-    val serialize_int31 : ('value, state, output) ctx -> state -> int -> (output, error) result
-    val serialize_int32 : ('value, state, output) ctx -> state -> int32 -> (output, error) result
-    val serialize_int64 : ('value, state, output) ctx -> state -> int64 -> (output, error) result
+    val serialize_int8 :
+      ('value, state, output) ctx -> state -> char -> (output, error) result
+
+    val serialize_int16 :
+      ('value, state, output) ctx -> state -> int -> (output, error) result
+
+    val serialize_int31 :
+      ('value, state, output) ctx -> state -> int -> (output, error) result
+
+    val serialize_int32 :
+      ('value, state, output) ctx -> state -> int32 -> (output, error) result
+
+    val serialize_int64 :
+      ('value, state, output) ctx -> state -> int64 -> (output, error) result
 
     val serialize_string :
       ('value, state, output) ctx -> state -> string -> (output, error) result
@@ -318,6 +338,7 @@ module Ser = struct
   let serialize_int31 (type value state output) int
       (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
     S.serialize_int31 self state int
+
   let serialize_int32 (type value state output) int
       (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
     S.serialize_int32 self state int
@@ -375,7 +396,7 @@ module rec De_base : sig
       state ctx ->
       state ->
       size:int ->
-      ('value, state) t ->
+      (size:int -> ('value, state) t) ->
       ('value, error) result
 
     val deserialize_element :
@@ -398,14 +419,14 @@ module rec De_base : sig
       state ctx ->
       state ->
       size:int ->
-      ('value, state) t ->
+      (size:int -> ('value, state) t) ->
       ('value, error) result
 
     val deserialize_record_variant :
       state ctx ->
       state ->
       size:int ->
-      ('value, state) t ->
+      (size:int -> ('value, state) t) ->
       ('value, error) result
 
     val deserialize_record :
@@ -466,7 +487,7 @@ end = struct
       state ctx ->
       state ->
       size:int ->
-      ('value, state) t ->
+      (size:int -> ('value, state) t) ->
       ('value, error) result
 
     val deserialize_element :
@@ -489,14 +510,14 @@ end = struct
       state ctx ->
       state ->
       size:int ->
-      ('value, state) t ->
+      (size:int -> ('value, state) t) ->
       ('value, error) result
 
     val deserialize_record_variant :
       state ctx ->
       state ->
       size:int ->
-      ('value, state) t ->
+      (size:int -> ('value, state) t) ->
       ('value, error) result
 
     val deserialize_record :

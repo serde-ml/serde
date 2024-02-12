@@ -228,13 +228,11 @@ module Deserializer = struct
   type state = { reader : Parser.t; mutable kind : kind }
 
   let nest { reader; _ } = { reader; kind = First }
-
   let deserialize_int8 _self state = Parser.read_int8 state.reader
   let deserialize_int16 _self state = Parser.read_int state.reader
   let deserialize_int31 _self state = Parser.read_int state.reader
   let deserialize_int32 _self state = Parser.read_int32 state.reader
   let deserialize_int64 _self state = Parser.read_int64 state.reader
-
   let deserialize_bool _self state = Parser.read_bool state.reader
   let deserialize_string _self state = Parser.read_string state.reader
 
@@ -249,9 +247,9 @@ module Deserializer = struct
     let* str = De.deserialize_string self in
     Visitor.visit_string self visitor str
 
-  let deserialize_sequence self s ~size:_ de =
+  let deserialize_sequence self s ~size de =
     let* () = Parser.read_open_bracket s.reader in
-    let* v = De.deserialize self de in
+    let* v = De.deserialize self (de ~size) in
     let* () = Parser.read_close_bracket s.reader in
     Ok v
 
@@ -278,7 +276,7 @@ module Deserializer = struct
 
   let deserialize_record_variant self { reader; _ } ~size de =
     let* () = Parser.read_colon reader in
-    De.deserialize_record self "" size de
+    De.deserialize_record self "" size (de ~size)
 
   let deserialize_variant self { reader; _ } visitor ~name:_ ~variants:_ =
     Parser.skip_space reader;

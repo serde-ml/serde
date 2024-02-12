@@ -185,7 +185,7 @@ let _serde_json_roundtrip_tests =
 
       variant ctx "variant_with_many_args" [ "C" ] @@ fun ctx ->
       let* `C = identifier ctx field_visitor in
-      tuple_variant ctx 2 @@ fun ctx ->
+      tuple_variant ctx 2 @@ fun ~size:_ ctx ->
       let* i = element ctx int32 in
       let i = Option.get i in
       let* str = element ctx string in
@@ -230,7 +230,7 @@ let _serde_json_roundtrip_tests =
 
       variant ctx "variant_with_many_args" [ "C" ] @@ fun ctx ->
       let* `C = identifier ctx field_visitor in
-      record_variant ctx 2 @@ fun ctx ->
+      record_variant ctx 2 @@ fun ~size:_ ctx ->
       let* is_inline = field ctx "is_inline" bool in
       Ok (D { is_inline }))
     (D { is_inline = true })
@@ -290,7 +290,7 @@ let _serde_json_roundtrip_tests =
   let list_deserializer =
     De.(
       deserializer @@ fun ctx ->
-      sequence ctx @@ fun ctx ->
+      sequence ctx @@ fun ~size:_ ctx ->
       let rec read_elements acc =
         let* v = element ctx string in
         match v with
@@ -324,7 +324,7 @@ let _serde_json_roundtrip_tests =
   let array_deserializer =
     De.(
       deserializer @@ fun ctx ->
-      sequence ctx @@ fun ctx ->
+      sequence ctx @@ fun ~size:_ ctx ->
       let rec read_elements acc =
         let* v = element ctx string in
         match v with
