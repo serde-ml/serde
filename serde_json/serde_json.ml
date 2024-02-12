@@ -64,8 +64,17 @@ module Json = struct
     let read_string { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_string yojson lexbuf)
 
+    let read_int8 { yojson; lexbuf } =
+      _run (fun () -> Yojson.Safe.read_int8 yojson lexbuf)
+
     let read_int { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_int yojson lexbuf)
+
+    let read_int32 { yojson; lexbuf } =
+      _run (fun () -> Yojson.Safe.read_int32 yojson lexbuf)
+
+    let read_int64 { yojson; lexbuf } =
+      _run (fun () -> Yojson.Safe.read_int64 yojson lexbuf)
 
     let read_null_if_possible { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_null_if_possible yojson lexbuf)
@@ -129,8 +138,20 @@ module Serializer = struct
   let serialize_string _self (S { fmt; _ }) string =
     Rio.write_all fmt ~buf:(Format.sprintf "%S" string)
 
-  let serialize_int _self (S { fmt; _ }) int =
+  let serialize_int8 _self (S { fmt; _ }) int =
+    Rio.write_all fmt ~buf:(String.make 1 int)
+
+  let serialize_int16 _self (S { fmt; _ }) int =
     Rio.write_all fmt ~buf:(Int.to_string int)
+
+  let serialize_int31 _self (S { fmt; _ }) int =
+    Rio.write_all fmt ~buf:(Int.to_string int)
+
+  let serialize_int32 _self (S { fmt; _ }) int =
+    Rio.write_all fmt ~buf:(Int32.to_string int)
+
+  let serialize_int64 _self (S { fmt; _ }) int =
+    Rio.write_all fmt ~buf:(Int64.to_string int)
 
   let serialize_none _self (S { fmt; _ }) = Fmt.null fmt
   let serialize_some self _state value = Ser.serialize self value
@@ -207,7 +228,13 @@ module Deserializer = struct
   type state = { reader : Parser.t; mutable kind : kind }
 
   let nest { reader; _ } = { reader; kind = First }
-  let deserialize_int _self state = Parser.read_int state.reader
+
+  let deserialize_int8 _self state = Parser.read_int8 state.reader
+  let deserialize_int16 _self state = Parser.read_int state.reader
+  let deserialize_int31 _self state = Parser.read_int state.reader
+  let deserialize_int32 _self state = Parser.read_int32 state.reader
+  let deserialize_int64 _self state = Parser.read_int64 state.reader
+
   let deserialize_bool _self state = Parser.read_bool state.reader
   let deserialize_string _self state = Parser.read_string state.reader
 
@@ -224,15 +251,6 @@ module Deserializer = struct
 
   let deserialize_sequence self s ~size:_ de =
     let* () = Parser.read_open_bracket s.reader in
-    (* let rec read_elements ~first acc = *)
-    (*   match (first, Parser.peek s.reader) with *)
-    (*   | false, Some ']' -> Ok (List.rev acc) *)
-    (*   | false, _ | true, Some ',' -> *)
-    (*       let* v = De.deserialize self de in *)
-    (*       read_elements ~first:false (v :: acc) *)
-    (*   | _ -> Error `invalid_field_type *)
-    (* in *)
-    (* let* v = read_elements ~first:true [] in *)
     let* v = De.deserialize self de in
     let* () = Parser.read_close_bracket s.reader in
     Ok v
