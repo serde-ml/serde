@@ -3,45 +3,6 @@ open Serde
 let ( let* ) = Result.bind
 
 module Json = struct
-  type t =
-    | Null
-    | Bool of bool
-    | Int of int
-    | Float of float
-    | String of string
-    | Object of (string * t) list
-    | Array of t list
-
-  let rec to_yojson t : Yojson.Safe.t =
-    match t with
-    | Null -> `Null
-    | Bool b -> `Bool b
-    | Int i -> `Int i
-    | Float f -> `Float f
-    | String s -> `String s
-    | Object o -> `Assoc (List.map (fun (k, v) -> (k, to_yojson v)) o)
-    | Array a -> `List (List.map to_yojson a)
-
-  let pp_list pp_el fmt t =
-    Format.fprintf fmt "[";
-    Format.pp_print_list
-      ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
-      pp_el fmt t;
-    Format.fprintf fmt "]"
-
-  let rec pp fmt t =
-    match t with
-    | Null -> Format.fprintf fmt "Null"
-    | Bool bool -> Format.fprintf fmt "(Bool %b)" bool
-    | Int int -> Format.fprintf fmt "(Int %d)" int
-    | Float float -> Format.fprintf fmt "(Float %f)" float
-    | String string -> Format.fprintf fmt "(String %S)" string
-    | Object fields ->
-        Format.fprintf fmt "(Object %a)" (pp_list pp_field) fields
-    | Array els -> Format.fprintf fmt "(Array %a)" (pp_list pp) els
-
-  and pp_field fmt (name, t) = Format.fprintf fmt "(%S, %a)" name pp t
-
   module Parser = struct
     type t = { yojson : Yojson.lexer_state; lexbuf : Lexing.lexbuf }
 
