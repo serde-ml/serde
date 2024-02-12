@@ -12,8 +12,9 @@ type variant_with_inline_record = D of { is_inline : bool }
 type nested = { nested_flag : bool }
 type record_nested = { nested : nested }
 type with_option = string option
-(* type with_nested_option = { nested_opt: with_option } *)
-(* type with_list = { users: string list } *)
+type with_nested_option = { nested_opt : with_option }
+type with_list = string list
+type with_array = string array
 
 let pp_variant fmt A = Format.fprintf fmt "A"
 let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i
@@ -35,127 +36,31 @@ let pp_with_option fmt opt =
   | None -> Format.fprintf fmt "None"
   | Some s -> Format.fprintf fmt "(Some %S)" s
 
-(* let _serde_json_serializer_test = *)
-(*   let test str ser value expected = *)
-(*     let actual_str = Serde_json.to_string ser value |> Result.get_ok in *)
-(*     let expect_str = *)
-(*       Serde_json.Json.to_yojson expected |> Yojson.Safe.pretty_to_string *)
-(*     in *)
+let pp_with_nested_option fmt { nested_opt } =
+  Format.fprintf fmt "({nested_opt=%a})" pp_with_option nested_opt
 
-(*     if String.equal actual_str expect_str then *)
-(*       Format.printf "serde_json.ser test %S %s\r\n%!" str (keyword "OK") *)
-(*     else ( *)
-(*       Format.printf "%s\n\nExpected:\n\n%s\n\nbut found:\n\n%s\n\n" *)
-(*         (error "JSON does not match") *)
-(*         expect_str actual_str; *)
-(*       assert false) *)
-(*   in *)
+let pp_with_list fmt (t : with_list) =
+  Format.fprintf fmt "[";
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
+    (fun fmt s -> Format.fprintf fmt "%S" s)
+    fmt t;
+  Format.fprintf fmt "]"
 
-(*   test "variant_without_args" *)
-(*     Ser.(serializer @@ fun ctx A -> variant ctx "variant" 0 "A" 1) *)
-(*     A *)
-(*     Json.(Object [ ("A", Array []) ]); *)
-
-(* test "variant_with_one_arg" *)
-(*   Ser.(fun (B i) -> variant "variant" (constructor "B" [ int i ])) *)
-(*   (B 2112) *)
-(*   Json.(Object [ ("B", Array [ Int 2112 ]) ]); *)
-
-(* test "variant_with_many_args" *)
-(*   Ser.( *)
-(*     fun (C (i, s)) -> variant "variant" (constructor "C" [ int i; string s ])) *)
-(*   (C (2112, "rush")) *)
-(*   Json.(Object [ ("C", Array [ Int 2112; String "rush" ]) ]); *)
-
-(* test "record_with_one_arg" *)
-(*   Ser.(fun r -> record "record" [ field "name" (string r.name) ]) *)
-(*   { name = "rush"; year = 0 } *)
-(*   Json.(Object [ ("name", String "rush") ]); *)
-
-(* test "record_with_many_args" *)
-(*   Ser.( *)
-(*     fun r -> *)
-(*       record "record" *)
-(*         [ field "name" (string r.name); field "level" (int r.year) ]) *)
-(*   { name = "rush"; year = 1972 } *)
-(*   Json.(Object [ ("name", String "rush"); ("level", Int 1972) ]); *)
-
-(* test "variant_with_anonymous_record" *)
-(*   Ser.( *)
-(*     fun (D r) -> *)
-(*       variant_record "var" *)
-(*         (constructor "D" [ field "is_inline" (bool r.is_inline) ])) *)
-(*   (D { is_inline = true }) *)
-(*   Json.(Object [ ("D", Object [ ("is_inline", Bool true) ]) ]); *)
-
-(* let serialize_nested r = *)
-(*   Ser.(record "nested" [ field "is_nested" (bool r.nested_flag) ]) *)
-(* in *)
-
-(* test "record_with_nested_record_field" *)
-(*   Ser.( *)
-(*     fun r -> record "record" [ field "nested" (serialize_nested r.nested) ]) *)
-(*   { nested = { nested_flag = true } } *)
-(*   Json.(Object [ ("nested", Object [ ("is_nested", Bool true) ]) ]); *)
-
-(* test "type_alias" Ser.(alias "age" int) (Alias ("age", Int)); *)
-(*   () *)
-
-(* let _serde_json_deserializer_test = *)
-(*   let test str pp ser json expect = *)
-(*     let actual_str = *)
-(*       match Serde_json.of_string ser json with *)
-(*       | Ok actual -> Format.asprintf "%a" pp actual *)
-(*       | Error err -> Format.asprintf "Exception: %a" Serde.pp_err err *)
-(*     in *)
-(*     let expect_str = Format.asprintf "%a" pp expect in *)
-
-(*     if String.equal actual_str expect_str then *)
-(*       Format.printf "serde_json.de test %S %s\r\n%!" str (keyword "OK") *)
-(*     else ( *)
-(*       Format.printf "%s\n\nExpected:\n\n%s\n\nbut found:\n\n%s\n\n" *)
-(*         (error "JSON does not match") *)
-(*         expect_str actual_str; *)
-(*       assert false) *)
-(*   in *)
-
-(*   test "variant_without_args" pp_variant *)
-(*     De.( *)
-(*       variant "variant" ~tag_of_string:(function *)
-(*         | "A" -> Ok `A *)
-(*         | _ -> Error `invalid_tag) *)
-(*       @@ fun self ctx -> *)
-(*       let* `A = constructor ctx self in *)
-(*       Ok A) *)
-(*     {|"A"|} A; *)
-
-(*   test "variant_with_one_arg" pp_variant_with_arg *)
-(*     De.( *)
-(*       variant "variant" ~tag_of_string:(function *)
-(*         | "B" -> Ok `B *)
-(*         | _ -> Error `invalid_tag) *)
-(*       @@ fun self ctx -> *)
-(*       let* `B = constructor ctx self in *)
-(*       let* int = int ctx in *)
-(*       Ok (B int)) *)
-(*     {| { "B": [1] } |} (B 1); *)
-
-(* test "variant_with_many_args" pp_variant_with_many_arg *)
-(*   De.( *)
-(*     variant "variant" *)
-(*       [ *)
-(*         constructor "C" (fun str i -> Ok (C (i, str))) *)
-(*         |> arg string |> arg int; *)
-(*       ]) *)
-(*   {| { "C": [2112, "rush"] } |} *)
-(*   (C (2112, "rush")); *)
+let pp_with_array fmt (t : with_array) =
+  Format.fprintf fmt "[|";
+  Format.pp_print_array
+    ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
+    (fun fmt s -> Format.fprintf fmt "%S" s)
+    fmt t;
+  Format.fprintf fmt "|]"
 
 let _serde_json_roundtrip_tests =
   let test str pp ser de value expect_str =
     let actual_str =
       match
         let* json = Serde_json.to_string ser value in
-        Printf.printf "json: %S\n%!" json;
+        (* Printf.printf "json: %S\n%!" json; *)
         Serde_json.of_string de json
       with
       | Ok actual -> Format.asprintf "%a" pp actual
@@ -282,7 +187,9 @@ let _serde_json_roundtrip_tests =
       let* `C = identifier ctx field_visitor in
       tuple_variant ctx 2 @@ fun ctx ->
       let* i = element ctx int in
+      let i = Option.get i in
       let* str = element ctx string in
+      let str = Option.get str in
       Ok (C (i, str)))
     (C (2112, "rush"))
     {|(C (2112, "rush"))|};
@@ -353,29 +260,108 @@ let _serde_json_roundtrip_tests =
     { nested = { nested_flag = false } }
     {|({nested={nested_flag=false}})|};
 
-  test "option/none" pp_with_option
-    Ser.(serializer @@ fun opt ctx ->
-    option string opt ctx )
+  let option_serializer =
+    Ser.(serializer @@ fun opt ctx -> option string opt ctx)
+  in
+  let option_deserializer =
     De.(
       deserializer @@ fun ctx ->
-      option ctx @@ fun ctx -> 
-        let* str = string ctx in
-        Ok (Some str)
-    )
+      option ctx @@ fun ctx ->
+      let* str = string ctx in
+      Ok (Some str))
+  in
+  test "option/some" pp_with_option option_serializer option_deserializer
     (Some "rush" : with_option)
     {|(Some "rush")|};
 
-  test "option/none" pp_with_option
-    Ser.(serializer @@ fun opt ctx ->
-    option string opt ctx )
-    De.(
-      deserializer @@ fun ctx ->
-      option ctx @@ fun ctx -> 
-        let* str = string ctx in
-        Ok (Some str)
-    )
-    None
+  test "option/none" pp_with_option option_serializer option_deserializer None
     {|None|};
 
+  let list_serializer =
+    Ser.(
+      serializer @@ fun ls ctx ->
+      sequence ctx (List.length ls) @@ fun ctx ->
+      List.fold_left
+        (fun acc el ->
+          match acc with Ok () -> element ctx (string el) | _ -> acc)
+        (Ok ()) ls)
+  in
 
+  let list_deserializer =
+    De.(
+      deserializer @@ fun ctx ->
+      sequence ctx @@ fun ctx ->
+      let rec read_elements acc =
+        let* v = element ctx string in
+        match v with
+        | Some s -> read_elements (s :: acc)
+        | None -> Ok (List.rev acc)
+      in
+      read_elements [])
+  in
+  test "list/empty" pp_with_list list_serializer list_deserializer
+    ([] : with_list)
+    {|[]|};
+
+  test "list/singleton" pp_with_list list_serializer list_deserializer
+    ([ "rush" ] : with_list)
+    {|["rush"]|};
+
+  test "list/many" pp_with_list list_serializer list_deserializer
+    ([ "rush"; "tom sawyer"; "xanadu"; "2112" ] : with_list)
+    {|["rush"; "tom sawyer"; "xanadu"; "2112"]|};
+
+  let array_serializer =
+    Ser.(
+      serializer @@ fun ls ctx ->
+      sequence ctx (Array.length ls) @@ fun ctx ->
+      Array.fold_left
+        (fun acc el ->
+          match acc with Ok () -> element ctx (string el) | _ -> acc)
+        (Ok ()) ls)
+  in
+
+  let array_deserializer =
+    De.(
+      deserializer @@ fun ctx ->
+      sequence ctx @@ fun ctx ->
+      let rec read_elements acc =
+        let* v = element ctx string in
+        match v with
+        | Some s -> read_elements (s :: acc)
+        | None -> Ok (Array.of_list (List.rev acc))
+      in
+      read_elements [])
+  in
+  test "array/empty" pp_with_array array_serializer array_deserializer
+    ([||] : with_array)
+    {|[||]|};
+
+  test "array/singleton" pp_with_array array_serializer array_deserializer
+    ([| "rush" |] : with_array)
+    {|[|"rush"|]|};
+
+  test "array/many" pp_with_array array_serializer array_deserializer
+    ([| "rush"; "tom sawyer"; "xanadu"; "2112" |] : with_array)
+    {|[|"rush"; "tom sawyer"; "xanadu"; "2112"|]|};
+
+  let nested_opt_ser =
+    Ser.(
+      serializer @@ fun r ctx ->
+      record ctx "with_nested_option" 1 @@ fun ctx ->
+      field ctx "nested_opt" (s option_serializer r.nested_opt))
+  in
+  let nested_opt_de =
+    De.(
+      deserializer @@ fun ctx ->
+      record ctx "with_nested_option" 1 @@ fun ctx ->
+      let* nested_opt = field ctx "nested_opt" option_deserializer in
+      Ok { nested_opt })
+  in
+  test "record with nested option/none" pp_with_nested_option nested_opt_ser
+    nested_opt_de { nested_opt = None } {|({nested_opt=None})|};
+  test "record with nested option/some" pp_with_nested_option nested_opt_ser
+    nested_opt_de
+    { nested_opt = Some "rush" }
+    {|({nested_opt=(Some "rush")})|};
   ()

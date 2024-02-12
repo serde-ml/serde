@@ -224,14 +224,29 @@ module Deserializer = struct
 
   let deserialize_sequence self s ~size:_ de =
     let* () = Parser.read_open_bracket s.reader in
+    (* let rec read_elements ~first acc = *)
+    (*   match (first, Parser.peek s.reader) with *)
+    (*   | false, Some ']' -> Ok (List.rev acc) *)
+    (*   | false, _ | true, Some ',' -> *)
+    (*       let* v = De.deserialize self de in *)
+    (*       read_elements ~first:false (v :: acc) *)
+    (*   | _ -> Error `invalid_field_type *)
+    (* in *)
+    (* let* v = read_elements ~first:true [] in *)
     let* v = De.deserialize self de in
     let* () = Parser.read_close_bracket s.reader in
     Ok v
 
   let deserialize_element self s de =
-    let* () = if s.kind = First then Ok () else Parser.read_comma s.reader in
-    s.kind <- Rest;
-    De.deserialize self de
+    match Parser.peek s.reader with
+    | Some ']' -> Ok None
+    | _ ->
+        let* () =
+          if s.kind = First then Ok () else Parser.read_comma s.reader
+        in
+        s.kind <- Rest;
+        let* v = De.deserialize self de in
+        Ok (Some v)
 
   let deserialize_unit_variant _self _state = Ok ()
 

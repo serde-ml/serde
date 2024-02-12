@@ -61,9 +61,10 @@ module rec Ser_base : sig
       ('value, state, output) ctx -> state -> (output, error) result
 
     val serialize_some :
-      ('value, state, output) ctx -> state -> 
-      (('value, state, output) ctx -> (output, error) result) 
-        -> (output, error) result
+      ('value, state, output) ctx ->
+      state ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
 
     val serialize_sequence :
       ('value, state, output) ctx ->
@@ -164,9 +165,10 @@ end = struct
       ('value, state, output) ctx -> state -> (output, error) result
 
     val serialize_some :
-      ('value, state, output) ctx -> state -> 
-      (('value, state, output) ctx -> (output, error) result) 
-        -> (output, error) result
+      ('value, state, output) ctx ->
+      state ->
+      (('value, state, output) ctx -> (output, error) result) ->
+      (output, error) result
 
     val serialize_sequence :
       ('value, state, output) ctx ->
@@ -255,6 +257,11 @@ module Ser = struct
       (Ctx (_, (module S), state) as self : (value, state, output) ctx) rec_type
       size fields =
     S.serialize_record self state ~rec_type ~size fields
+
+  let sequence (type value state output)
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) size
+      elements =
+    S.serialize_sequence self state ~size elements
 
   let unit_variant (type value state output)
       (Ctx (_, (module S), state) as self : (value, state, output) ctx) var_type
@@ -345,7 +352,7 @@ module rec De_base : sig
       ('value, error) result
 
     val deserialize_element :
-      state ctx -> state -> ('value, state) t -> ('value, error) result
+      state ctx -> state -> ('value, state) t -> ('value option, error) result
 
     val deserialize_variant :
       state ctx ->
@@ -398,7 +405,12 @@ module rec De_base : sig
     val deserialize_string : state ctx -> state -> (string, error) result
     val deserialize_int : state ctx -> state -> (int, error) result
     val deserialize_bool : state ctx -> state -> (bool, error) result
-    val deserialize_option : state ctx -> state -> ('value option, state) t -> ('value option, error) result
+
+    val deserialize_option :
+      state ctx ->
+      state ->
+      ('value option, state) t ->
+      ('value option, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -427,7 +439,7 @@ end = struct
       ('value, error) result
 
     val deserialize_element :
-      state ctx -> state -> ('value, state) t -> ('value, error) result
+      state ctx -> state -> ('value, state) t -> ('value option, error) result
 
     val deserialize_variant :
       state ctx ->
@@ -480,7 +492,12 @@ end = struct
     val deserialize_string : state ctx -> state -> (string, error) result
     val deserialize_int : state ctx -> state -> (int, error) result
     val deserialize_bool : state ctx -> state -> (bool, error) result
-    val deserialize_option : state ctx -> state -> ('value option, state) t -> ('value option, error) result
+
+    val deserialize_option :
+      state ctx ->
+      state ->
+      ('value option, state) t ->
+      ('value option, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -560,7 +577,8 @@ module De = struct
   let deserialize_string (type state) (((module D), state) as ctx : state ctx) =
     D.deserialize_string ctx state
 
-  let deserialize_option (type state) (((module D), state) as ctx : state ctx) de =
+  let deserialize_option (type state) (((module D), state) as ctx : state ctx)
+      de =
     D.deserialize_option ctx state de
 
   let record ctx name size de = deserialize_record ctx name size de
@@ -569,6 +587,7 @@ module De = struct
     let visitor = { Visitor.default with visit_variant } in
     deserialize_variant ctx ~visitor ~name ~variants
 
+  let sequence ctx de = deserialize_sequence ctx 0 de
   let bool ctx = deserialize_bool ctx
   let int ctx = deserialize_int ctx
   let string ctx = deserialize_string ctx
