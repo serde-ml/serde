@@ -1,4 +1,5 @@
 (lang dune 3.5)
+(cram enable)
 
 (name serde)
 
@@ -23,7 +24,7 @@
    ))
 
 (package
- (name serde_ppx)
+ (name serde_derive)
  (synopsis "Derive-macros for the Serde serialization framework")
  (description "These macros help derive serializers and deserializers for your existing types and provide all the functionality you expect to plug in different data-formats.")
  (depends

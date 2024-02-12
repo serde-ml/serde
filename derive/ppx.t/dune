@@ -1,0 +1,4 @@
+(library
+  (name ppx_test)
+  (preprocess (pps serde_derive))
+  (libraries serde))
