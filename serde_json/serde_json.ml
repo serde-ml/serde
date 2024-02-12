@@ -171,7 +171,14 @@ module Serializer = struct
     Fmt.end_object fmt
 
   let serialize_field self (S s) ~name values =
-    let first = if s.kind = First then true else false in
+    let first =
+      if s.kind = First then (
+        Printf.printf "s.kind = First\n%!";
+        true)
+      else (
+        Printf.printf "s.kind = Rest\n%!";
+        false)
+    in
     s.kind <- Rest;
     let* () = Fmt.begin_object_key ~first s.fmt in
     let* () = Rio.write_all s.fmt ~buf:(Format.sprintf "%S" name) in

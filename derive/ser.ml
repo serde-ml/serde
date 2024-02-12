@@ -20,7 +20,7 @@ let serializer_fn_name_for_longident name =
 
 let is_primitive = function
   | "bool" | "char" | "float" | "int" | "int32" | "int64" | "string" | "list"
-  | "array" | "unit" ->
+  | "array" | "unit" | "option" ->
       true
   | _ -> false
 
@@ -30,7 +30,7 @@ let rec serializer_for_type ~ctxt (core_type : Parsetree.core_type) =
   | Ptyp_constr (name, arg :: []) when is_primitive (Longident.name name.txt) ->
       let type_ser = serializer_for_type ~ctxt arg in
       let name = Ast.pexp_ident ~loc name in
-      [%expr [%e name] [%e type_ser]]
+      [%expr s [%e name] [%e type_ser]]
   | Ptyp_constr (name, []) when is_primitive (Longident.name name.txt) ->
       Ast.pexp_ident ~loc name
   | Ptyp_constr (name, _args) ->
@@ -63,7 +63,7 @@ let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
         let field_name = Ast.estring ~loc field.pld_name.txt in
         let field_access =
           let field_name = Longident.parse field.pld_name.txt in
-          Ast.pexp_field ~loc (Ast.evar ~loc "r") (Loc.make ~loc field_name)
+          Ast.pexp_field ~loc (Ast.evar ~loc "t") (Loc.make ~loc field_name)
         in
         let serializer = serializer_for_type ~ctxt field.pld_type in
         [%expr field ctx [%e field_name] ([%e serializer] [%e field_access])])
@@ -79,9 +79,7 @@ let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
       [%expr Ok ()] fields
   in
 
-  [%expr
-    Serde.Ser.record ctx [%e type_name] [%e field_count] @@ fun ctx ->
-    [%e fields]]
+  [%expr record ctx [%e type_name] [%e field_count] (fun ctx -> [%e fields])]
 
 let gen_serialize_impl ~ctxt type_decl =
   let loc = loc ~ctxt in

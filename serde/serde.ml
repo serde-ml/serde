@@ -363,6 +363,14 @@ module Ser = struct
     | None -> S.serialize_none self state
     | Some s -> S.serialize_some self state (fun ctx -> ser s ctx)
 
+  let list ser values ctx =
+    sequence ctx (List.length values) @@ fun ctx ->
+    List.fold_left
+      (fun acc el -> match acc with Ok () -> element ctx (ser el) | _ -> acc)
+      (Ok ()) values
+
+  let array ser values ctx = list ser (Array.to_list values) ctx
+
   let s :
       type value value2 state output.
       (value, state, output) t ->
@@ -671,6 +679,23 @@ module De = struct
   let element ctx de = deserialize_element ctx de
   let field ctx name de = deserialize_field ctx name de
   let option ctx de = deserialize_option ctx de
+
+  let list de ctx =
+    sequence ctx @@ fun ~size ctx ->
+    let rec read_elements acc =
+      let* v = element ctx de in
+      let last_element = size > 0 && List.length acc = size - 1 in
+      match v with
+      | Some s when last_element -> Ok (s :: acc)
+      | Some s -> read_elements (s :: acc)
+      | None -> Ok acc
+    in
+    let* list = read_elements [] in
+    Ok (List.rev list)
+
+  let array de ctx =
+    let* list = list de ctx in
+    Ok (Array.of_list list)
 
   let d (type state) de ((((module D) as self), state) : state ctx) =
     let state = D.nest state in

@@ -11,6 +11,7 @@ type simple_record = { name : string; year : int }
 type variant_with_inline_record = D of { is_inline : bool }
 type nested = { nested_flag : bool }
 type record_nested = { nested : nested }
+type record_with_list = { keys : string list; collection : string }
 type with_option = string option
 type with_nested_option = { nested_opt : with_option }
 type with_list = string list
@@ -55,12 +56,15 @@ let pp_with_array fmt (t : with_array) =
     fmt t;
   Format.fprintf fmt "|]"
 
+let pp_record_with_list fmt { keys; collection } =
+  Format.fprintf fmt "{keys=%a;collection=%S}" pp_with_list keys collection
+
 let _serde_json_roundtrip_tests =
   let test str pp ser de value expect_str =
     let actual_str =
       match
         let* json = Serde_json.to_string ser value in
-        (* Printf.printf "json: %S\n%!" json; *)
+        Printf.printf "json: %S\n%!" json;
         Serde_json.of_string de json
       with
       | Ok actual -> Format.asprintf "%a" pp actual
@@ -364,4 +368,34 @@ let _serde_json_roundtrip_tests =
     nested_opt_de
     { nested_opt = Some "rush" }
     {|({nested_opt=(Some "rush")})|};
+
+  test "record_with_list" pp_record_with_list
+    Ser.(
+      serializer @@ fun r ctx ->
+      record ctx "record_with_list" 1 @@ fun ctx ->
+      let* () = field ctx "keys" (s (list string) r.keys) in
+      field ctx "collection" (string r.collection))
+    De.(
+      deserializer @@ fun ctx ->
+      record ctx "record_with_list" 1 @@ fun ctx ->
+      let* keys = field ctx "keys" (d (list string)) in
+      let* collection = field ctx "collection" string in
+      Ok { keys; collection })
+    { keys = [ "rush"; "genesis"; "foo fighters" ]; collection = "bands" }
+    {|{keys=["rush"; "genesis"; "foo fighters"];collection="bands"}|};
+
+  test "record_with_list/empty" pp_record_with_list
+    Ser.(
+      serializer @@ fun r ctx ->
+      record ctx "record_with_list" 1 @@ fun ctx ->
+      let* () = field ctx "keys" (list string r.keys) in
+      field ctx "collection" (string r.collection))
+    De.(
+      deserializer @@ fun ctx ->
+      record ctx "record_with_list" 1 @@ fun ctx ->
+      let* keys = field ctx "keys" (d (list string)) in
+      let* collection = field ctx "collection" string in
+      Ok { keys; collection })
+    { keys = []; collection = "bands" }
+    {|{keys=["rush"; "genesis"; "foo fighters"];collection="bands"}|};
   ()

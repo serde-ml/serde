@@ -8,4 +8,5 @@
 (cram
  (deps
   (package serde)
-  (package serde_derive)))
+  (package serde_derive)
+  (package serde_json)))

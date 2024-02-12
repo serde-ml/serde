@@ -1,3 +1,5 @@
-(library
- (name examples)
- (libraries serde))
+(executable
+ (name starfleet)
+ (preprocess
+  (pps serde_derive))
+ (libraries serde serde_json))
