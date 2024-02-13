@@ -30,7 +30,7 @@ let rec serializer_for_type ~ctxt (core_type : Parsetree.core_type) =
   | Ptyp_constr (name, arg :: []) when is_primitive (Longident.name name.txt) ->
       let type_ser = serializer_for_type ~ctxt arg in
       let name = Ast.pexp_ident ~loc name in
-      [%expr s [%e name] [%e type_ser]]
+      [%expr s ([%e name] [%e type_ser])]
   | Ptyp_constr (name, []) when is_primitive (Longident.name name.txt) ->
       Ast.pexp_ident ~loc name
   | Ptyp_constr (name, _args) ->

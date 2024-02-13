@@ -1,4 +1,4 @@
 (executable
   (name ppx_test)
   (preprocess (pps serde_derive))
-  (libraries serde))
+  (libraries serde serde_json))

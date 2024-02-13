@@ -1,40 +1,37 @@
   $ dune clean
-  $ dune build
-  File "ppx_test.ml", lines 1-5, characters 0-37:
-  1 | type rank = { 
-  2 |   rank_name : string; 
-  3 |   rank_scores : string list;
-  4 | }
-  5 | [@@deriving serializer, deserializer]
-  Error: This expression has type
-           ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result) ->
-           'a list -> ('b, 'c, unit) ctx -> (unit, Serde.error) result
-         but an expression was expected of type
-           ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result, 'd, 'e) t =
-             ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result) ->
-             ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result, 'd, 'e)
-             ctx -> ('e, Serde.error) result
-         Type 'a list is not compatible with type
-           ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result, 'd, 'e) ctx
-  [1]
-  $ dune exec ./ppx_test.exe
-  File "ppx_test.ml", lines 1-5, characters 0-37:
-  1 | type rank = { 
-  2 |   rank_name : string; 
-  3 |   rank_scores : string list;
-  4 | }
-  5 | [@@deriving serializer, deserializer]
-  Error: This expression has type
-           ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result) ->
-           'a list -> ('b, 'c, unit) ctx -> (unit, Serde.error) result
-         but an expression was expected of type
-           ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result, 'd, 'e) t =
-             ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result) ->
-             ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result, 'd, 'e)
-             ctx -> ('e, Serde.error) result
-         Type 'a list is not compatible with type
-           ('a -> ('b, 'c, unit) ctx -> (unit, Serde.error) result, 'd, 'e) ctx
-  [1]
+  $ dune exec ./ppx_test.exe | jq .
+  {
+    "stuff": [
+      {
+        "name": "hello",
+        "commisioned": false,
+        "updated_at": 9223372036854775806,
+        "credits": null,
+        "keywords": [],
+        "rank": {
+          "rank_scores": [
+            "1",
+            "c",
+            "a"
+          ],
+          "rank_name": "asdf"
+        }
+      },
+      {
+        "name": "hello",
+        "commisioned": false,
+        "updated_at": 0,
+        "credits": 2112,
+        "keywords": [
+          "hello"
+        ],
+        "rank": {
+          "rank_scores": [],
+          "rank_name": "asdf"
+        }
+      }
+    ]
+  }
   $ dune describe pp ./ppx_test.ml
   [@@@ocaml.ppx.context
     {
@@ -54,8 +51,8 @@
       cookies = []
     }]
   type rank = {
-    rank_name: string ;
-    rank_scores: string list }[@@deriving (serializer, deserializer)]
+    rank_scores: string list ;
+    rank_name: string }[@@deriving serializer]
   include
     struct
       let _ = fun (_ : rank) -> ()
@@ -66,24 +63,12 @@
             fun ctx ->
               record ctx "rank" 2
                 (fun ctx ->
-                   let* () = field ctx "rank_name" (string t.rank_name)
-                    in
                    let* () =
-                     field ctx "rank_scores" ((s list string) t.rank_scores)
+                     field ctx "rank_scores" ((s (list string)) t.rank_scores)
+                    in
+                   let* () = field ctx "rank_name" (string t.rank_name)
                     in Ok ())
       let _ = serialize_rank
-      let deserialize_rank =
-        let ( let* ) = Result.bind in
-        let open Serde.De in
-          fun t ->
-            fun ctx ->
-              record ctx "rank" 2
-                (fun ctx ->
-                   let* rank_name = field ctx "rank_name" string
-                    in
-                   let* rank_scores = field ctx "rank_scores" (d list string)
-                    in Ok ())
-      let _ = deserialize_rank
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
   type t =
     {
@@ -92,7 +77,7 @@
     updated_at: int64 ;
     credits: int32 option ;
     keywords: string array ;
-    rank: rank }[@@deriving (serializer, deserializer)]
+    rank: rank }[@@deriving serializer]
   include
     struct
       let _ = fun (_ : t) -> ()
@@ -109,43 +94,52 @@
                     in
                    let* () = field ctx "updated_at" (int64 t.updated_at)
                     in
-                   let* () = field ctx "credits" ((s option int32) t.credits)
+                   let* () = field ctx "credits" ((s (option int32)) t.credits)
                     in
-                   let* () = field ctx "keywords" ((s array string) t.keywords)
+                   let* () =
+                     field ctx "keywords" ((s (array string)) t.keywords)
                     in
                    let* () = field ctx "rank" ((s serialize_rank) t.rank)
                     in Ok ())
       let _ = serialize_t
-      let deserialize_t =
+    end[@@ocaml.doc "@inline"][@@merlin.hide ]
+  type t_list = {
+    stuff: t list }[@@deriving serializer]
+  include
+    struct
+      let _ = fun (_ : t_list) -> ()
+      let serialize_t_list =
         let ( let* ) = Result.bind in
-        let open Serde.De in
+        let open Serde.Ser in
           fun t ->
             fun ctx ->
-              record ctx "t" 6
+              record ctx "t_list" 1
                 (fun ctx ->
-                   let* name = field ctx "name" string
-                    in
-                   let* commisioned = field ctx "commisioned" bool
-                    in
-                   let* updated_at = field ctx "updated_at" int64
-                    in
-                   let* credits = field ctx "credits" (d option int32)
-                    in
-                   let* keywords = field ctx "keywords" (d array string)
-                    in
-                   let* rank = field ctx "rank" (d deserialize_rank)
+                   let* () =
+                     field ctx "stuff" ((s (list (s serialize_t))) t.stuff)
                     in Ok ())
-      let _ = deserialize_t
+      let _ = serialize_t_list
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
   let () =
     let test_t =
       {
-        name = "hello";
-        commisioned = false;
-        updated_at = (let open Int64 in sub max_int 1L);
-        credits = None;
-        keywords = [||];
-        rank = { rank_name = "asdf"; rank_scores = ["1"; "c"; "a"] }
+        stuff =
+          [{
+             name = "hello";
+             commisioned = false;
+             updated_at = ((let open Int64 in sub max_int 1L));
+             credits = None;
+             keywords = [||];
+             rank = { rank_name = "asdf"; rank_scores = ["1"; "c"; "a"] }
+           };
+          {
+            name = "hello";
+            commisioned = false;
+            updated_at = 0L;
+            credits = (Some 2112l);
+            keywords = [|"hello"|];
+            rank = { rank_name = "asdf"; rank_scores = [] }
+          }]
       } in
-    let json = Serde_json.to_string serialize_t test_t in
+    let json = (Serde_json.to_string serialize_t_list test_t) |> Result.get_ok in
     Format.printf "%s\n%!" json
