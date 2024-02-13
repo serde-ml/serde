@@ -84,11 +84,17 @@ module Serde_bin = struct
   end
 
   module Deserializer = struct
-    type state = D : { reader : 'a Rio.Reader.t } -> state
+    type state =
+      | D : {
+          reader : 'a Rio.Reader.t;
+          mutable size : int;
+          mutable off : int;
+        }
+          -> state
 
-    let nest (D { reader }) = D { reader }
+    let nest (D { reader; _ }) = D { reader; size = 0; off = 0 }
 
-    let read capacity (D { reader }) =
+    let read capacity (D { reader; _ }) =
       let bytes = Bytes.create capacity in
       let* len = Rio.read reader bytes in
       Ok (Bytes.sub bytes 0 len)
@@ -123,23 +129,29 @@ module Serde_bin = struct
       let* bool = De.deserialize_int8 self in
       if Char.equal bool (Char.chr 0) then Ok true else Ok false
 
-    let deserialize_sequence self _state ~size:_ elements =
+    let deserialize_sequence self (D s) ~size:_ elements =
       let* size = De.deserialize_int31 self in
+      s.size <- size;
       De.deserialize self (elements ~size)
 
-    let deserialize_element self _state element =
-      let* v = De.deserialize self element in
-      Ok (Some v)
+    let deserialize_element self (D s) element =
+      if s.off < s.size then (
+        let* v = De.deserialize self element in
+        s.off <- s.off + 1;
+        Ok (Some v))
+      else Ok None
 
     let deserialize_unit_variant _self _state = Ok ()
     let deserialize_newtype_variant self _state args = De.deserialize self args
 
-    let deserialize_tuple_variant self _state ~size:_ args =
+    let deserialize_tuple_variant self (D s) ~size:_ args =
       let* size = De.deserialize_int31 self in
+      s.size <- size;
       De.deserialize self (args ~size)
 
-    let deserialize_record_variant self _state ~size:_ args =
+    let deserialize_record_variant self (D s) ~size:_ args =
       let* size = De.deserialize_int31 self in
+      s.size <- size;
       De.deserialize self (args ~size)
 
     let deserialize_record self _state ~name:_ ~size:_ fields =
@@ -184,7 +196,7 @@ module Serde_bin = struct
     let reader =
       Rio.Reader.of_read_src (module StrRead) StrRead.(make string)
     in
-    let state = Deserializer.(D { reader }) in
+    let state = Deserializer.(D { reader; size = 0; off = 0 }) in
     Serde.deserialize (module Deserializer) state de
 end
 
@@ -574,7 +586,7 @@ let _serde_bin_roundtrip_tests =
     Ser.(
       serializer @@ fun r ctx ->
       record ctx "record_with_list" 1 @@ fun ctx ->
-      let* () = field ctx "keys" (list string r.keys) in
+      let* () = field ctx "keys" (s (list string) r.keys) in
       field ctx "collection" (string r.collection))
     De.(
       deserializer @@ fun ctx ->
@@ -583,5 +595,5 @@ let _serde_bin_roundtrip_tests =
       let* collection = field ctx "collection" string in
       Ok { keys; collection })
     { keys = []; collection = "bands" }
-    {|{keys=["rush"; "genesis"; "foo fighters"];collection="bands"}|};
+    {|{keys=[];collection="bands"}|};
   ()

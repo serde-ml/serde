@@ -681,14 +681,10 @@ module De = struct
   let option ctx de = deserialize_option ctx de
 
   let list de ctx =
-    sequence ctx @@ fun ~size ctx ->
+    sequence ctx @@ fun ~size:_ ctx ->
     let rec read_elements acc =
       let* v = element ctx de in
-      let last_element = size > 0 && List.length acc = size - 1 in
-      match v with
-      | Some s when last_element -> Ok (s :: acc)
-      | Some s -> read_elements (s :: acc)
-      | None -> Ok acc
+      match v with Some s -> read_elements (s :: acc) | None -> Ok acc
     in
     let* list = read_elements [] in
     Ok (List.rev list)

@@ -388,7 +388,7 @@ let _serde_json_roundtrip_tests =
     Ser.(
       serializer @@ fun r ctx ->
       record ctx "record_with_list" 1 @@ fun ctx ->
-      let* () = field ctx "keys" (list string r.keys) in
+      let* () = field ctx "keys" (s (list string) r.keys) in
       field ctx "collection" (string r.collection))
     De.(
       deserializer @@ fun ctx ->
@@ -397,5 +397,5 @@ let _serde_json_roundtrip_tests =
       let* collection = field ctx "collection" string in
       Ok { keys; collection })
     { keys = []; collection = "bands" }
-    {|{keys=["rush"; "genesis"; "foo fighters"];collection="bands"}|};
+    {|{keys=[];collection="bands"}|};
   ()
