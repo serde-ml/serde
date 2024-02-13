@@ -202,7 +202,9 @@ module Deserializer = struct
     | Some 'n' ->
         let* () = Parser.read_null reader in
         Ok None
-    | _ -> De.deserialize self de
+    | _ ->
+        let* v = De.deserialize self de in
+        Ok (Some v)
 
   let deserialize_identifier self _state visitor =
     let* str = De.deserialize_string self in

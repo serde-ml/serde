@@ -166,7 +166,10 @@ module Serde_bin = struct
 
     let deserialize_option self _state de =
       let* tag = De.deserialize_int8 self in
-      if Char.equal tag (Char.chr 0) then Ok None else De.deserialize self de
+      if Char.equal tag (Char.chr 0) then Ok None
+      else
+        let* v = De.deserialize self de in
+        Ok (Some v)
 
     let deserialize_variant self _state visitor ~name:_ ~variants:_ =
       Visitor.visit_variant self visitor
@@ -460,13 +463,7 @@ let _serde_bin_roundtrip_tests =
   let option_serializer =
     Ser.(serializer @@ fun opt ctx -> option string opt ctx)
   in
-  let option_deserializer =
-    De.(
-      deserializer @@ fun ctx ->
-      option ctx @@ fun ctx ->
-      let* str = string ctx in
-      Ok (Some str))
-  in
+  let option_deserializer = De.(deserializer @@ fun ctx -> option string ctx) in
   test "option/some" pp_with_option option_serializer option_deserializer
     (Some "rush" : with_option)
     {|(Some "rush")|};

@@ -467,10 +467,7 @@ module rec De_base : sig
     val deserialize_bool : state ctx -> state -> (bool, error) result
 
     val deserialize_option :
-      state ctx ->
-      state ->
-      ('value option, state) t ->
-      ('value option, error) result
+      state ctx -> state -> ('value, state) t -> ('value option, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -558,10 +555,7 @@ end = struct
     val deserialize_bool : state ctx -> state -> (bool, error) result
 
     val deserialize_option :
-      state ctx ->
-      state ->
-      ('value option, state) t ->
-      ('value option, error) result
+      state ctx -> state -> ('value, state) t -> ('value option, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -678,7 +672,7 @@ module De = struct
   let record_variant ctx size de = deserialize_record_variant ctx size de
   let element ctx de = deserialize_element ctx de
   let field ctx name de = deserialize_field ctx name de
-  let option ctx de = deserialize_option ctx de
+  let option de ctx = deserialize_option ctx de
 
   let list de ctx =
     sequence ctx @@ fun ~size:_ ctx ->

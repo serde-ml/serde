@@ -2,7 +2,7 @@ type rank = {
   rank_scores : string list;
   rank_name : string; 
 }
-[@@deriving serializer]
+[@@deriving serializer, deserializer]
 
 type t = { 
   name : string; 
@@ -12,10 +12,10 @@ type t = {
   keywords: string array;
   rank: rank
 }
-[@@deriving serializer]
+[@@deriving serializer, deserializer]
 
 type t_list = { stuff : t list }
-[@@deriving serializer]
+[@@deriving serializer, deserializer]
 
 let () = 
   let test_t = { 
@@ -39,5 +39,7 @@ let () =
     ]
   }
   in
-  let json = Serde_json.to_string serialize_t_list test_t |> Result.get_ok in
-  Format.printf "%s\n%!" json
+  let json1 = Serde_json.to_string serialize_t_list test_t |> Result.get_ok in
+  let value = Serde_json.of_string deserialize_t_list json1 |> Result.get_ok in
+  let json2 = Serde_json.to_string serialize_t_list value |> Result.get_ok in
+  Format.printf "[%s,%s]\n%!" json1 json2

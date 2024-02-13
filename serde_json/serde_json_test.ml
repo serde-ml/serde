@@ -267,13 +267,7 @@ let _serde_json_roundtrip_tests =
   let option_serializer =
     Ser.(serializer @@ fun opt ctx -> option string opt ctx)
   in
-  let option_deserializer =
-    De.(
-      deserializer @@ fun ctx ->
-      option ctx @@ fun ctx ->
-      let* str = string ctx in
-      Ok (Some str))
-  in
+  let option_deserializer = De.(deserializer @@ fun ctx -> option string ctx) in
   test "option/some" pp_with_option option_serializer option_deserializer
     (Some "rush" : with_option)
     {|(Some "rush")|};

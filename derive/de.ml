@@ -30,7 +30,7 @@ let rec deserializer_for_type ~ctxt (core_type : Parsetree.core_type) =
   | Ptyp_constr (name, arg :: []) when is_primitive (Longident.name name.txt) ->
       let type_ser = deserializer_for_type ~ctxt arg in
       let name = Ast.pexp_ident ~loc name in
-      [%expr d [%e name] [%e type_ser]]
+      [%expr d ([%e name] [%e type_ser])]
   | Ptyp_constr (name, []) when is_primitive (Longident.name name.txt) ->
       Ast.pexp_ident ~loc name
   | Ptyp_constr (name, _args) ->
@@ -57,6 +57,19 @@ let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
   let type_name = Ast.estring ~loc ptype_name.txt in
   let field_count = Ast.eint ~loc (List.length label_declarations) in
 
+  let record_expr =
+    let fields =
+      List.map
+        (fun field ->
+          let value = Ast.evar ~loc field.pld_name.txt in
+          let field = Longident.parse field.pld_name.txt |> var ~ctxt in
+          (field, value))
+        label_declarations
+    in
+    let record = Ast.pexp_record ~loc fields None in
+    [%expr Ok [%e record]]
+  in
+
   let fields =
     List.map
       (fun field ->
@@ -75,7 +88,7 @@ let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
         [%expr
           let* [%p field] = [%e expr] in
           [%e last]])
-      [%expr Ok ()] fields
+      record_expr fields
   in
 
   [%expr record ctx [%e type_name] [%e field_count] (fun ctx -> [%e fields])]
@@ -106,7 +119,7 @@ let gen_serialize_impl ~ctxt type_decl =
   [%stri
     let [%p deserializer_name] =
       let ( let* ) = Result.bind in
-      Serde.De.(fun t ctx -> [%e body])]
+      Serde.De.(fun ctx -> [%e body])]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
   List.map (gen_serialize_impl ~ctxt) type_declarations
