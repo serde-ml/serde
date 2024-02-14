@@ -8,6 +8,12 @@ let var ~ctxt name =
   let loc = loc ~ctxt in
   Loc.make ~loc name
 
+let gensym () =
+  let counter = ref 0 in
+  fun ~ctxt ->
+    counter := !counter + 1;
+    var ~ctxt ("v_" ^ Int.to_string !counter)
+
 let deserializer_fn_name_for_longident name =
   let name =
     match name.txt |> Longident.flatten_exn |> List.rev with
@@ -63,15 +69,34 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
          cstr_declarations)
   in
 
-  let deser_by_constructor _type_name _idx cstr =
+  let deser_by_constructor _type_name idx cstr =
+    let _idx = Ast.eint ~loc idx in
+    let name = Longident.parse cstr.pcd_name.txt |> var ~ctxt in
     match cstr.pcd_args with
     | Pcstr_tuple [] ->
-        let name = Longident.parse cstr.pcd_name.txt |> var ~ctxt in
         let value = Ast.pexp_construct ~loc name None in
         [%expr
           let* () = unit_variant ctx in
           Ok [%e value]]
-    | _ -> [%expr 1]
+    | Pcstr_tuple [ arg ] ->
+        let sym = gensym () ~ctxt in
+        let arg_pat = Ast.pvar ~loc sym.txt in
+        let arg_var = Ast.evar ~loc sym.txt in
+
+        let value =
+          let cstr = Ast.pexp_construct ~loc name (Some arg_var) in
+          [%expr Ok [%e cstr]]
+        in
+
+        let ser_fn = deserializer_for_type ~ctxt arg in
+        let body =
+          [%expr
+            let* [%p arg_pat] = [%e ser_fn] ctx in
+            [%e value]]
+        in
+
+        [%expr newtype_variant ctx @@ fun ctx -> [%e body]]
+    | _ -> [%expr Obj.magic 1]
   in
 
   let tag_dispatch =

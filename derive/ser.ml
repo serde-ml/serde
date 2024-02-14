@@ -79,7 +79,12 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
     match cstr.pcd_args with
     | Pcstr_tuple [] ->
         [%expr unit_variant ctx [%e type_name] [%e idx] [%e name]]
-    | _ -> [%expr 1]
+    | Pcstr_tuple [ arg ] ->
+        let ser_fn = serializer_for_type ~ctxt arg in
+        let arg_var = Ast.evar ~loc (gensym () ~ctxt).txt in
+        let ser = [%expr [%e ser_fn] [%e arg_var]] in
+        [%expr newtype_variant ctx [%e type_name] [%e idx] [%e name] [%e ser]]
+    | _ -> [%expr Obj.magic 1]
   in
 
   let cases =
