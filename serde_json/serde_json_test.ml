@@ -64,7 +64,7 @@ let _serde_json_roundtrip_tests =
     let actual_str =
       match
         let* json = Serde_json.to_string ser value in
-        Printf.printf "json: %S\n%!" json;
+        (* Printf.printf "json: %S\n%!" json; *)
         Serde_json.of_string de json
       with
       | Ok actual -> Format.asprintf "%a" pp actual
