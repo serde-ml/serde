@@ -8,6 +8,12 @@ let var ~ctxt name =
   let loc = loc ~ctxt in
   Loc.make ~loc name
 
+let gensym () =
+  let counter = ref 0 in
+  fun ~ctxt ->
+    counter := !counter + 1;
+    var ~ctxt ("v_" ^ Int.to_string !counter)
+
 let serializer_fn_name_for_longident name =
   let name =
     match name.txt |> Longident.flatten_exn |> List.rev with
@@ -52,6 +58,41 @@ let rec serializer_for_type ~ctxt (core_type : Parsetree.core_type) =
 
 (** implementation *)
 
+let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
+  let loc = loc ~ctxt in
+  let type_name = Ast.estring ~loc ptype_name.txt in
+
+  let pattern_of_constructor cstr =
+    match cstr.pcd_args with
+    | Pcstr_tuple [] -> None
+    | Pcstr_tuple parts ->
+        let gensym = gensym () in
+        Some
+          (Ast.ppat_tuple ~loc
+             (List.map (fun _ -> Ast.pvar ~loc (gensym ~ctxt).txt) parts))
+    | Pcstr_record _ -> None
+  in
+
+  let ser_by_constructor type_name idx cstr =
+    let idx = Ast.eint ~loc idx in
+    let name = Ast.estring ~loc cstr.pcd_name.txt in
+    match cstr.pcd_args with
+    | Pcstr_tuple [] ->
+        [%expr unit_variant ctx [%e type_name] [%e idx] [%e name]]
+    | _ -> [%expr 1]
+  in
+
+  let cases =
+    List.mapi
+      (fun idx (cstr : Parsetree.constructor_declaration) ->
+        let lhs = Ast.pconstruct cstr (pattern_of_constructor cstr) in
+        let rhs = ser_by_constructor type_name idx cstr in
+        Ast.case ~lhs ~guard:None ~rhs)
+      cstr_declarations
+  in
+
+  Ast.pexp_match ~loc [%expr t] cases
+
 let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
@@ -90,6 +131,8 @@ let gen_serialize_impl ~ctxt type_decl =
     match type_decl with
     | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
         gen_serialize_record_impl ~ctxt ptype_name label_declarations
+    | { ptype_kind = Ptype_variant cstrs_declaration; ptype_name; _ } ->
+        gen_serialize_variant_impl ~ctxt ptype_name cstrs_declaration
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with
@@ -104,13 +147,12 @@ let gen_serialize_impl ~ctxt type_decl =
   let serializer_name =
     "serialize_" ^ typename |> var ~ctxt |> Ast.ppat_var ~loc
   in
-  [%stri
-    let [%p serializer_name] =
-      let ( let* ) = Result.bind in
-      Serde.Ser.(fun t ctx -> [%e body])]
+  [%stri let [%p serializer_name] = Serde.Ser.(fun t ctx -> [%e body])]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
-  List.map (gen_serialize_impl ~ctxt) type_declarations
+  let loc = loc ~ctxt in
+  [ [%stri let ( let* ) = Result.bind] ]
+  @ List.map (gen_serialize_impl ~ctxt) type_declarations
 
 let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
 
@@ -122,5 +164,5 @@ let intf_generator = Deriving.Generator.V2.make_noarg generate_intf
 (** registration *)
 
 let register =
-  Deriving.add "serializer" ~str_type_decl:impl_generator
+  Deriving.add "serialize" ~str_type_decl:impl_generator
     ~sig_type_decl:intf_generator

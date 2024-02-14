@@ -85,13 +85,10 @@ let _serde_json_roundtrip_tests =
     De.(
       deserializer @@ fun ctx ->
       let field_visitor =
-        Visitor.
-          {
-            default with
-            visit_string =
-              (fun _ctx str ->
-                match str with "A" -> Ok `A | _ -> Error `invalid_tag);
-          }
+        Visitor.make
+          ~visit_string:(fun _ctx str ->
+            match str with "A" -> Ok `A | _ -> Error `invalid_tag)
+          ()
       in
 
       variant ctx "simple_variant" [ "A" ] @@ fun ctx ->

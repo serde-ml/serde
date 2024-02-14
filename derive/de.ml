@@ -52,6 +52,70 @@ let rec deserializer_for_type ~ctxt (core_type : Parsetree.core_type) =
 
 (** implementation *)
 
+let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
+  let loc = loc ~ctxt in
+  let type_name = Ast.estring ~loc ptype_name.txt in
+  let constructor_names =
+    Ast.elist ~loc
+      (List.map
+         (fun (cstr : Parsetree.constructor_declaration) ->
+           Ast.estring ~loc cstr.pcd_name.txt)
+         cstr_declarations)
+  in
+
+  let deser_by_constructor _type_name _idx cstr =
+    match cstr.pcd_args with
+    | Pcstr_tuple [] ->
+        let name = Longident.parse cstr.pcd_name.txt |> var ~ctxt in
+        let value = Ast.pexp_construct ~loc name None in
+        [%expr
+          let* () = unit_variant ctx in
+          Ok [%e value]]
+    | _ -> [%expr 1]
+  in
+
+  let tag_dispatch =
+    let cases =
+      List.mapi
+        (fun idx (cstr : Parsetree.constructor_declaration) ->
+          let lhs = Ast.ppat_variant ~loc cstr.pcd_name.txt None in
+          let rhs = deser_by_constructor type_name idx cstr in
+          Ast.case ~lhs ~guard:None ~rhs)
+        cstr_declarations
+    in
+
+    Ast.pexp_match ~loc [%expr tag] cases
+  in
+
+  let field_visitor =
+    let cases =
+      List.mapi
+        (fun _idx (cstr : Parsetree.constructor_declaration) ->
+          let tag_name = cstr.pcd_name.txt in
+          let lhs = Ast.ppat_constant ~loc (Ast_helper.Const.string tag_name) in
+          let rhs =
+            let tag = Ast.pexp_variant ~loc cstr.pcd_name.txt None in
+            [%expr Ok [%e tag]]
+          in
+          Ast.case ~lhs ~guard:None ~rhs)
+        cstr_declarations
+      @ [
+          Ast.case ~lhs:(Ast.ppat_any ~loc) ~guard:None
+            ~rhs:[%expr Error `invalid_tag];
+        ]
+    in
+
+    let tag_match = Ast.pexp_match ~loc [%expr str] cases in
+
+    [%expr Visitor.make ~visit_string:(fun _ctx str -> [%e tag_match]) ()]
+  in
+
+  [%expr
+    let field_visitor = [%e field_visitor] in
+    variant ctx [%e type_name] [%e constructor_names] @@ fun ctx ->
+    let* tag = identifier ctx field_visitor in
+    [%e tag_dispatch]]
+
 let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
@@ -102,6 +166,8 @@ let gen_serialize_impl ~ctxt type_decl =
     match type_decl with
     | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
         gen_serialize_record_impl ~ctxt ptype_name label_declarations
+    | { ptype_kind = Ptype_variant cstrs_declaration; ptype_name; _ } ->
+        gen_serialize_variant_impl ~ctxt ptype_name cstrs_declaration
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with
@@ -122,7 +188,9 @@ let gen_serialize_impl ~ctxt type_decl =
       Serde.De.(fun ctx -> [%e body])]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
-  List.map (gen_serialize_impl ~ctxt) type_declarations
+  let loc = loc ~ctxt in
+  [ [%stri open! Serde]; [%stri let ( let* ) = Result.bind] ]
+  @ List.map (gen_serialize_impl ~ctxt) type_declarations
 
 let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
 
@@ -134,5 +202,5 @@ let intf_generator = Deriving.Generator.V2.make_noarg generate_intf
 (** registration *)
 
 let register =
-  Deriving.add "deserializer" ~str_type_decl:impl_generator
+  Deriving.add "deserialize" ~str_type_decl:impl_generator
     ~sig_type_decl:intf_generator

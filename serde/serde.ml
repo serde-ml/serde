@@ -576,6 +576,10 @@ module Visitor = struct
         visit_variant = (fun _ctx -> Error `unimplemented);
       }
 
+  let make ?(visit_int = default.visit_int)
+      ?(visit_string = default.visit_string) () =
+    { default with visit_int; visit_string }
+
   let visit_variant ctx t = t.visit_variant ctx
   let visit_string ctx t str = t.visit_string ctx str
   let visit_int ctx t str = t.visit_int ctx str
