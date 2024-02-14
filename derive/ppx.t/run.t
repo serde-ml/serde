@@ -258,7 +258,12 @@ Now we test the variants:
         {
           "Lt": true
         },
-        "Captain"
+        {
+          "Captain": {
+            "name": "janeway",
+            "ship": "voyager"
+          }
+        }
       ]
     },
     {
@@ -279,7 +284,12 @@ Now we test the variants:
         {
           "Lt": true
         },
-        "Captain"
+        {
+          "Captain": {
+            "name": "janeway",
+            "ship": "voyager"
+          }
+        }
       ]
     }
   ]
@@ -303,7 +313,9 @@ Now we test the variants:
     }]
   [@@@warning "-37"]
   type rank =
-    | Captain 
+    | Captain of {
+    name: string ;
+    ship: string } 
     | Commander of string * int32 
     | Lt of bool option 
     | Ensign [@@deriving (serialize, deserialize)]
@@ -317,7 +329,12 @@ Now we test the variants:
           fun t ->
             fun ctx ->
               match t with
-              | Captain -> unit_variant ctx "rank" 0 "Captain"
+              | Captain r ->
+                  record_variant ctx "rank" 0 "Captain" 2
+                    (fun ctx ->
+                       let* () = field ctx "name" (string r.name)
+                        in let* () = field ctx "ship" (string r.ship)
+                            in Ok ())
               | Commander (v_1, v_2) ->
                   tuple_variant ctx "rank" 1 "Commander" 2
                     (fun ctx ->
@@ -350,8 +367,15 @@ Now we test the variants:
                  let* tag = identifier ctx field_visitor
                   in
                  match tag with
-                 | `Captain -> let* () = unit_variant ctx
-                                in Ok Captain
+                 | `Captain ->
+                     record_variant ctx 2
+                       (fun ~size ->
+                          fun ctx ->
+                            ignore size;
+                            (let* name = field ctx "name" string
+                              in
+                             let* ship = field ctx "ship" string
+                              in Ok (Captain { name; ship })))
                  | `Commander ->
                      tuple_variant ctx 2
                        (fun ~size ->
@@ -428,7 +452,7 @@ Now we test the variants:
         Lt None;
         Lt (Some false);
         Lt (Some true);
-        Captain] in
+        Captain { name = "janeway"; ship = "voyager" }] in
     let json1 = (Serde_json.to_string serialize_ranks test_t) |> Result.get_ok in
     let value = (Serde_json.of_string deserialize_ranks json1) |> Result.get_ok in
     let json2 = (Serde_json.to_string serialize_ranks value) |> Result.get_ok in

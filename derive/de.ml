@@ -140,7 +140,50 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
           tuple_variant ctx [%e arg_count] (fun ~size ctx ->
               ignore size;
               [%e calls])]
-    | _ -> [%expr Obj.magic 1]
+    (* NOTE(@leostera): deserialize a record_variant *)
+    | Pcstr_record labels ->
+        let field_count = Ast.eint ~loc (List.length labels) in
+        let record_expr =
+          let fields =
+            List.map
+              (fun field ->
+                let value = Ast.evar ~loc field.pld_name.txt in
+                let field = Longident.parse field.pld_name.txt |> var ~ctxt in
+                (field, value))
+              labels
+          in
+          let record = Ast.pexp_record ~loc fields None in
+          let cstr = Ast.pexp_construct ~loc name (Some record) in
+          [%expr Ok [%e cstr]]
+        in
+
+        let fields =
+          List.map
+            (fun field ->
+              let field_name = Ast.estring ~loc field.pld_name.txt in
+              let deserializer = deserializer_for_type ~ctxt field.pld_type in
+              let de_expr =
+                [%expr field ctx [%e field_name] [%e deserializer]]
+              in
+              let field_name = field.pld_name.txt in
+              (field_name, de_expr))
+            (List.rev labels)
+        in
+
+        let fields =
+          List.fold_left
+            (fun last (field, expr) ->
+              let field = Ast.(pvar ~loc field) in
+              [%expr
+                let* [%p field] = [%e expr] in
+                [%e last]])
+            record_expr fields
+        in
+
+        [%expr
+          record_variant ctx [%e field_count] (fun ~size ctx ->
+              ignore size;
+              [%e fields])]
   in
 
   let tag_dispatch =

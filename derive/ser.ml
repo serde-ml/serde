@@ -70,7 +70,7 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
         Some
           (Ast.ppat_tuple ~loc
              (List.map (fun _ -> Ast.pvar ~loc (gensym ~ctxt).txt) parts))
-    | Pcstr_record _ -> None
+    | Pcstr_record _ -> Some (Ast.pvar ~loc "r")
   in
 
   let ser_by_constructor type_name idx cstr =
@@ -105,9 +105,36 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
             [%expr Ok ()] (List.rev calls)
         in
         [%expr
-          tuple_variant ctx [%e type_name] [%e idx] [%e name] [%e arg_count ]( fun ctx ->
-          [%e calls])]
-    | _ -> [%expr Obj.magic 1]
+          tuple_variant ctx [%e type_name] [%e idx] [%e name] [%e arg_count]
+            (fun ctx -> [%e calls])]
+    | Pcstr_record labels ->
+        let field_count = Ast.eint ~loc (List.length labels) in
+        let fields =
+          List.map
+            (fun field ->
+              let field_name = Ast.estring ~loc field.pld_name.txt in
+              let field_access =
+                let field_name = Longident.parse field.pld_name.txt in
+                Ast.pexp_field ~loc (Ast.evar ~loc "r")
+                  (Loc.make ~loc field_name)
+              in
+              let serializer = serializer_for_type ~ctxt field.pld_type in
+              [%expr
+                field ctx [%e field_name] ([%e serializer] [%e field_access])])
+            (List.rev labels)
+        in
+        let fields =
+          List.fold_left
+            (fun last curr ->
+              [%expr
+                let* () = [%e curr] in
+                [%e last]])
+            [%expr Ok ()] fields
+        in
+
+        [%expr
+          record_variant ctx [%e type_name] [%e idx] [%e name] [%e field_count]
+            (fun ctx -> [%e fields])]
   in
 
   let cases =
