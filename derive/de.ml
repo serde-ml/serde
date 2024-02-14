@@ -73,11 +73,14 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
     let _idx = Ast.eint ~loc idx in
     let name = Longident.parse cstr.pcd_name.txt |> var ~ctxt in
     match cstr.pcd_args with
+    (* NOTE(@leostera): deserialize a single unit variant by calling
+       `unit_variant` directly *)
     | Pcstr_tuple [] ->
         let value = Ast.pexp_construct ~loc name None in
         [%expr
           let* () = unit_variant ctx in
           Ok [%e value]]
+    (* NOTE(@leostera): deserialize a newtype variant *)
     | Pcstr_tuple [ arg ] ->
         let sym = gensym () ~ctxt in
         let arg_pat = Ast.pvar ~loc sym.txt in
@@ -96,6 +99,47 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
         in
 
         [%expr newtype_variant ctx @@ fun ctx -> [%e body]]
+    (* NOTE(@leostera): deserialize a tuple variant *)
+    | Pcstr_tuple args ->
+        let gensym = gensym () in
+        let arg_count = Ast.eint ~loc (List.length args) in
+        let calls =
+          List.mapi
+            (fun _idx arg ->
+              let ser_fn = deserializer_for_type ~ctxt arg in
+              let arg_var = (gensym ~ctxt).txt in
+              let deser =
+                [%expr
+                  match element ctx [%e ser_fn] with
+                  | Ok (Some v) -> Ok v
+                  | Ok None -> Error `no_more_data
+                  | Error reason -> Error reason]
+              in
+
+              (arg_var, deser))
+            args
+        in
+
+        let calls =
+          let args =
+            Ast.pexp_tuple ~loc
+              (List.map (fun (field, _) -> Ast.evar ~loc field) calls)
+          in
+          let cstr = Ast.pexp_construct ~loc name (Some args) in
+
+          List.fold_left
+            (fun last (field, expr) ->
+              let field = Ast.pvar ~loc field in
+              [%expr
+                let* [%p field] = [%e expr] in
+                [%e last]])
+            [%expr Ok [%e cstr]]
+            (List.rev calls)
+        in
+        [%expr
+          tuple_variant ctx [%e arg_count] (fun ~size ctx ->
+              ignore size;
+              [%e calls])]
     | _ -> [%expr Obj.magic 1]
   in
 

@@ -2,7 +2,7 @@
 
 type rank = 
   | Captain
-  | Commander
+  | Commander of string * int32
   | Lt of bool option
   | Ensign 
 [@@deriving serialize, deserialize]
@@ -13,7 +13,7 @@ type ranks = Ranks of rank list
 let () = 
   let test_t = Ranks [
     Ensign;
-    Commander;
+    Commander ("riker", 2112l);
     Lt None;
     Lt (Some false);
     Lt (Some true);
@@ -24,3 +24,4 @@ let () =
   let value = Serde_json.of_string deserialize_ranks json1 |> Result.get_ok in
   let json2 = Serde_json.to_string serialize_ranks value |> Result.get_ok in
   Format.printf "[%s,%s]\n%!" json1 json2
+

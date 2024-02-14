@@ -86,7 +86,7 @@
     }]
   type rank = {
     rank_scores: string list ;
-    rank_name: string }[@@deriving (serializer, deserializer)]
+    rank_name: string }[@@deriving (serialize, deserialize)]
   include
     struct
       let _ = fun (_ : rank) -> ()
@@ -104,6 +104,7 @@
                    let* () = field ctx "rank_name" (string t.rank_name)
                     in Ok ())
       let _ = serialize_rank
+      open! Serde
       let ( let* ) = Result.bind
       let _ = ( let* )
       let deserialize_rank =
@@ -125,7 +126,7 @@
     updated_at: int64 ;
     credits: int32 option ;
     keywords: string array ;
-    rank: rank }[@@deriving (serializer, deserializer)]
+    rank: rank }[@@deriving (serialize, deserialize)]
   include
     struct
       let _ = fun (_ : t) -> ()
@@ -151,6 +152,7 @@
                    let* () = field ctx "rank" ((s serialize_rank) t.rank)
                     in Ok ())
       let _ = serialize_t
+      open! Serde
       let ( let* ) = Result.bind
       let _ = ( let* )
       let deserialize_t =
@@ -175,7 +177,7 @@
       let _ = deserialize_t
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
   type t_list = {
-    stuff: t list }[@@deriving (serializer, deserializer)]
+    stuff: t list }[@@deriving (serialize, deserialize)]
   include
     struct
       let _ = fun (_ : t_list) -> ()
@@ -191,6 +193,7 @@
                      field ctx "stuff" ((s (list (s serialize_t))) t.stuff)
                     in Ok ())
       let _ = serialize_t_list
+      open! Serde
       let ( let* ) = Result.bind
       let _ = ( let* )
       let deserialize_t_list =
@@ -236,7 +239,50 @@
 Now we test the variants:
 
   $ dune exec ./variant_test.exe | jq .
-  "Ensign"
+  [
+    {
+      "Ranks": [
+        "Ensign",
+        {
+          "Commander": [
+            "riker",
+            2112
+          ]
+        },
+        {
+          "Lt": null
+        },
+        {
+          "Lt": false
+        },
+        {
+          "Lt": true
+        },
+        "Captain"
+      ]
+    },
+    {
+      "Ranks": [
+        "Ensign",
+        {
+          "Commander": [
+            "riker",
+            2112
+          ]
+        },
+        {
+          "Lt": null
+        },
+        {
+          "Lt": false
+        },
+        {
+          "Lt": true
+        },
+        "Captain"
+      ]
+    }
+  ]
   $ dune describe pp ./variant_test.ml
   [@@@ocaml.ppx.context
     {
@@ -258,9 +304,9 @@ Now we test the variants:
   [@@@warning "-37"]
   type rank =
     | Captain 
-    | Commander 
-    | Lt 
-    | Ensign [@@deriving serializer]
+    | Commander of string * int32 
+    | Lt of bool option 
+    | Ensign [@@deriving (serialize, deserialize)]
   include
     struct
       let _ = fun (_ : rank) -> ()
@@ -272,12 +318,118 @@ Now we test the variants:
             fun ctx ->
               match t with
               | Captain -> unit_variant ctx "rank" 0 "Captain"
-              | Commander -> unit_variant ctx "rank" 1 "Commander"
-              | Lt -> unit_variant ctx "rank" 2 "Lt"
+              | Commander (v_1, v_2) ->
+                  tuple_variant ctx "rank" 1 "Commander" 2
+                    (fun ctx ->
+                       let* () = element ctx (string v_1)
+                        in let* () = element ctx (int32 v_2)
+                            in Ok ())
+              | Lt v_1 ->
+                  newtype_variant ctx "rank" 2 "Lt" ((s (option bool)) v_1)
               | Ensign -> unit_variant ctx "rank" 3 "Ensign"
       let _ = serialize_rank
+      open! Serde
+      let ( let* ) = Result.bind
+      let _ = ( let* )
+      let deserialize_rank =
+        let ( let* ) = Result.bind in
+        let open Serde.De in
+          fun ctx ->
+            let field_visitor =
+              Visitor.make
+                ~visit_string:(fun _ctx ->
+                                 fun str ->
+                                   match str with
+                                   | "Captain" -> Ok `Captain
+                                   | "Commander" -> Ok `Commander
+                                   | "Lt" -> Ok `Lt
+                                   | "Ensign" -> Ok `Ensign
+                                   | _ -> Error `invalid_tag) () in
+            (variant ctx "rank" ["Captain"; "Commander"; "Lt"; "Ensign"]) @@
+              (fun ctx ->
+                 let* tag = identifier ctx field_visitor
+                  in
+                 match tag with
+                 | `Captain -> let* () = unit_variant ctx
+                                in Ok Captain
+                 | `Commander ->
+                     tuple_variant ctx 2
+                       (fun ~size ->
+                          fun ctx ->
+                            ignore size;
+                            (let* v_1 =
+                               match element ctx string with
+                               | Ok (Some v) -> Ok v
+                               | Ok (None) -> Error `no_more_data
+                               | Error reason -> Error reason
+                              in
+                             let* v_2 =
+                               match element ctx int32 with
+                               | Ok (Some v) -> Ok v
+                               | Ok (None) -> Error `no_more_data
+                               | Error reason -> Error reason
+                              in Ok (Commander (v_1, v_2))))
+                 | `Lt ->
+                     (newtype_variant ctx) @@
+                       ((fun ctx ->
+                           let* v_1 = (d (option bool)) ctx
+                            in Ok (Lt v_1)))
+                 | `Ensign -> let* () = unit_variant ctx
+                               in Ok Ensign)
+      let _ = deserialize_rank
+    end[@@ocaml.doc "@inline"][@@merlin.hide ]
+  type ranks =
+    | Ranks of rank list [@@deriving (serialize, deserialize)]
+  include
+    struct
+      let _ = fun (_ : ranks) -> ()
+      let ( let* ) = Result.bind
+      let _ = ( let* )
+      let serialize_ranks =
+        let open Serde.Ser in
+          fun t ->
+            fun ctx ->
+              match t with
+              | Ranks v_1 ->
+                  newtype_variant ctx "ranks" 0 "Ranks"
+                    ((s (list (s serialize_rank))) v_1)
+      let _ = serialize_ranks
+      open! Serde
+      let ( let* ) = Result.bind
+      let _ = ( let* )
+      let deserialize_ranks =
+        let ( let* ) = Result.bind in
+        let open Serde.De in
+          fun ctx ->
+            let field_visitor =
+              Visitor.make
+                ~visit_string:(fun _ctx ->
+                                 fun str ->
+                                   match str with
+                                   | "Ranks" -> Ok `Ranks
+                                   | _ -> Error `invalid_tag) () in
+            (variant ctx "ranks" ["Ranks"]) @@
+              (fun ctx ->
+                 let* tag = identifier ctx field_visitor
+                  in
+                 match tag with
+                 | `Ranks ->
+                     (newtype_variant ctx) @@
+                       ((fun ctx ->
+                           let* v_1 = (d (list (d deserialize_rank))) ctx
+                            in Ok (Ranks v_1))))
+      let _ = deserialize_ranks
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
   let () =
-    let test_t = Ensign in
-    let json1 = (Serde_json.to_string serialize_rank test_t) |> Result.get_ok in
-    Format.printf "%s\n%!" json1
+    let test_t =
+      Ranks
+        [Ensign;
+        Commander ("riker", 2112l);
+        Lt None;
+        Lt (Some false);
+        Lt (Some true);
+        Captain] in
+    let json1 = (Serde_json.to_string serialize_ranks test_t) |> Result.get_ok in
+    let value = (Serde_json.of_string deserialize_ranks json1) |> Result.get_ok in
+    let json2 = (Serde_json.to_string serialize_ranks value) |> Result.get_ok in
+    Format.printf "[%s,%s]\n%!" json1 json2

@@ -84,6 +84,29 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
         let arg_var = Ast.evar ~loc (gensym () ~ctxt).txt in
         let ser = [%expr [%e ser_fn] [%e arg_var]] in
         [%expr newtype_variant ctx [%e type_name] [%e idx] [%e name] [%e ser]]
+    | Pcstr_tuple args ->
+        let arg_count = Ast.eint ~loc (List.length args) in
+        let gensym = gensym () in
+        let calls =
+          List.mapi
+            (fun _idx arg ->
+              let ser_fn = serializer_for_type ~ctxt arg in
+              let arg_var = Ast.evar ~loc (gensym ~ctxt).txt in
+              [%expr element ctx ([%e ser_fn] [%e arg_var])])
+            args
+        in
+
+        let calls =
+          List.fold_left
+            (fun last expr ->
+              [%expr
+                let* () = [%e expr] in
+                [%e last]])
+            [%expr Ok ()] (List.rev calls)
+        in
+        [%expr
+          tuple_variant ctx [%e type_name] [%e idx] [%e name] [%e arg_count ]( fun ctx ->
+          [%e calls])]
     | _ -> [%expr Obj.magic 1]
   in
 
