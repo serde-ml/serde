@@ -7,13 +7,13 @@ license: "MIT"
 homepage: "https://github.com/leostera/serde.ml"
 bug-reports: "https://github.com/leostera/serde.ml/issues"
 depends: [
-  "dune" {>= "3.5"}
-  "ocaml" {>= "4.14.0"}
+  "ocaml" {>= "5.1.1"}
   "serde" {= version}
   "serde_derive" {= version}
   "ppx_inline_test" {>= "v0.16.0"}
   "yojson" {>= "2.1.0"}
   "ppx_yojson_conv" {with-test & >= "v0.16.0"}
+  "dune" {>= "3.5"}
   "odoc" {with-doc}
 ]
 build: [

@@ -51,12 +51,13 @@
  (name serde_json)
  (synopsis "JSON format support for Serde")
  (depends
-   (ocaml (>= "4.14.0"))
+   (ocaml (>= "5.1.1"))
    (serde (= :version))
    (serde_derive (= :version))
    (ppx_inline_test (>= "v0.16.0"))
    (yojson (>= "2.1.0"))
    (ppx_yojson_conv (and :with-test (>= "v0.16.0")))
+   dune
    ))
 
 ; (package
