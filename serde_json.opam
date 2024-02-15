@@ -4,16 +4,18 @@ synopsis: "JSON format support for Serde"
 maintainer: ["Leandro Ostera <leandro@abstractmachines.dev>"]
 authors: ["Leandro Ostera <leandro@abstractmachines.dev>"]
 license: "MIT"
-homepage: "https://github.com/leostera/serde.ml"
-bug-reports: "https://github.com/leostera/serde.ml/issues"
+homepage: "https://github.com/serde-ml/serde"
+bug-reports: "https://github.com/serde-ml/serde/issues"
 depends: [
   "ocaml" {>= "5.1.1"}
+  "ppx_inline_test" {>= "v0.16.0"}
+  "qcheck" {with-test}
+  "rio" {>= "0.0.8"}
   "serde" {= version}
   "serde_derive" {= version}
-  "ppx_inline_test" {>= "v0.16.0"}
+  "spices" {with-test}
   "yojson" {>= "2.1.0"}
-  "ppx_yojson_conv" {with-test & >= "v0.16.0"}
-  "dune" {>= "3.5"}
+  "dune" {>= "3.14"}
   "odoc" {with-doc}
 ]
 build: [
@@ -30,4 +32,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/leostera/serde.ml.git"
+dev-repo: "git+https://github.com/serde-ml/serde.git"

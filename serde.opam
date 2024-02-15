@@ -2,18 +2,18 @@
 opam-version: "2.0"
 synopsis: "A serialization framework for OCaml"
 description:
-  "Serde is a serialization framework for OCaml that runs on the principle of maximum efficiency and user ergonomics while maintaining format flexibility. Internally Serde uses an intermediate language that can be cheaply mapped to and from different target formats like JSON, XML, or S-expressions, which makes Serde good for transcoding data as well."
+  "Serde is a serialization framework for OCaml that runs on the principle of maximum efficiency and user ergonomics while maintaining format flexibility."
 maintainer: ["Leandro Ostera <leandro@abstractmachines.dev>"]
 authors: ["Leandro Ostera <leandro@abstractmachines.dev>"]
 license: "MIT"
-homepage: "https://github.com/leostera/serde.ml"
-bug-reports: "https://github.com/leostera/serde.ml/issues"
+homepage: "https://github.com/serde-ml/serde"
+bug-reports: "https://github.com/serde-ml/serde/issues"
 depends: [
   "ocaml" {>= "5.1.1"}
-  "rio"
   "qcheck" {with-test}
+  "rio" {>= "0.0.8"}
   "spices" {with-test}
-  "dune" {>= "3.5"}
+  "dune" {>= "3.14"}
   "odoc" {with-doc}
 ]
 build: [
@@ -30,4 +30,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/leostera/serde.ml.git"
+dev-repo: "git+https://github.com/serde-ml/serde.git"

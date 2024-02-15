@@ -6,14 +6,14 @@ description:
 maintainer: ["Leandro Ostera <leandro@abstractmachines.dev>"]
 authors: ["Leandro Ostera <leandro@abstractmachines.dev>"]
 license: "MIT"
-homepage: "https://github.com/leostera/serde.ml"
-bug-reports: "https://github.com/leostera/serde.ml/issues"
+homepage: "https://github.com/serde-ml/serde"
+bug-reports: "https://github.com/serde-ml/serde/issues"
 depends: [
-  "ppxlib" {>= "0.28.0"}
-  "ppx_deriving" {>= "5.2.1"}
-  "serde" {= version}
   "ocaml" {>= "5.1.1"}
-  "dune" {>= "3.5"}
+  "ppx_deriving" {>= "5.2.1"}
+  "ppxlib" {>= "0.28.0"}
+  "serde" {= version}
+  "dune" {>= "3.14"}
   "odoc" {with-doc}
 ]
 build: [
@@ -30,4 +30,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/leostera/serde.ml.git"
+dev-repo: "git+https://github.com/serde-ml/serde.git"

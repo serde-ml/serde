@@ -5,7 +5,7 @@
 (* let sisko = { name = "Benjamin Sisko"; rank = Captain } *)
 
 type rank = { rank_name : string; rank_scores : string list }
-[@@deriving serializer]
+[@@deriving serialize]
 
 type t = {
   name : string;
@@ -15,7 +15,7 @@ type t = {
   keywords : string array;
   rank : rank;
 }
-[@@deriving serializer]
+[@@deriving serialize]
 
 let () =
   let test_t =
