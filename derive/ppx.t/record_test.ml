@@ -23,7 +23,7 @@ let () =
       {
         name = "hello";
         commisioned = false;
-        updated_at = Int64.(sub max_int 1L);
+        updated_at = 9223372036854766L;
         credits = None;
         keywords =  [||];
         rank = { rank_name = "asdf"; rank_scores = ["1";"c";"a"]}

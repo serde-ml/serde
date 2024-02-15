@@ -6,7 +6,7 @@
         {
           "name": "hello",
           "commisioned": false,
-          "updated_at": 9223372036854775806,
+          "updated_at": 9223372036854766,
           "credits": null,
           "keywords": [],
           "rank": {
@@ -38,7 +38,7 @@
         {
           "name": "hello",
           "commisioned": false,
-          "updated_at": 9223372036854775806,
+          "updated_at": 9223372036854766,
           "credits": null,
           "keywords": [],
           "rank": {
@@ -213,7 +213,7 @@
           [{
              name = "hello";
              commisioned = false;
-             updated_at = ((let open Int64 in sub max_int 1L));
+             updated_at = 9223372036854766L;
              credits = None;
              keywords = [||];
              rank = { rank_name = "asdf"; rank_scores = ["1"; "c"; "a"] }
