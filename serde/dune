@@ -7,4 +7,4 @@
  (package serde)
  (name serde_test)
  (modules serde_test)
- (libraries serde qcheck spices bytestring))
+ (libraries serde qcheck spices))

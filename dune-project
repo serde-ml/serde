@@ -20,6 +20,9 @@
  (description "Serde is a serialization framework for OCaml that runs on the principle of maximum efficiency and user ergonomics while maintaining format flexibility. Internally Serde uses an intermediate language that can be cheaply mapped to and from different target formats like JSON, XML, or S-expressions, which makes Serde good for transcoding data as well.")
  (depends
    (ocaml (>= "5.1.1"))
+   rio
+   (qcheck :with-test)
+   (spices :with-test)
    dune
    ))
 

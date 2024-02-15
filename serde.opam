@@ -10,6 +10,9 @@ homepage: "https://github.com/leostera/serde.ml"
 bug-reports: "https://github.com/leostera/serde.ml/issues"
 depends: [
   "ocaml" {>= "5.1.1"}
+  "rio"
+  "qcheck" {with-test}
+  "spices" {with-test}
   "dune" {>= "3.5"}
   "odoc" {with-doc}
 ]
