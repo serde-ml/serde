@@ -46,6 +46,7 @@ jobs:
           allow-prerelease-opam: ${{ matrix.allow-prerelease-opam }}
           opam-repositories: ${{ matrix.opam-repositories }}
 
+      - run: opam pin rio.0.0.8 git+https://github.com/riot-ml/riot
       - run: opam install . --deps-only --with-test
 
       - run: opam exec -- dune build
