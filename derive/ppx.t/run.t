@@ -117,10 +117,42 @@
           fun ctx ->
             record ctx "rank" 2
               (fun ctx ->
-                 let* rank_scores = field ctx "rank_scores" (d (list string))
+                 let field_visitor =
+                   let visit_string _ctx str =
+                     match str with
+                     | "rank_name" -> Ok `rank_name
+                     | "rank_scores" -> Ok `rank_scores
+                     | _ -> Error `invalid_tag in
+                   let visit_int _ctx str =
+                     match str with
+                     | 0 -> Ok `rank_name
+                     | 1 -> Ok `rank_scores
+                     | _ -> Error `invalid_tag in
+                   Visitor.make ~visit_string ~visit_int () in
+                 let rank_scores = ref None in
+                 let rank_name = ref None in
+                 let rec read_fields () =
+                   let* tag = next_field ctx field_visitor
+                    in
+                   match tag with
+                   | Some `rank_name ->
+                       let* v = field ctx "rank_name" string
+                        in (rank_name := (Some v); read_fields ())
+                   | Some `rank_scores ->
+                       let* v = field ctx "rank_scores" (d (list string))
+                        in (rank_scores := (Some v); read_fields ())
+                   | None -> Ok () in
+                 let* () = read_fields ()
                   in
-                 let* rank_name = field ctx "rank_name" string
-                  in Ok { rank_scores; rank_name })
+                 let* rank_scores =
+                   Option.to_result
+                     ~none:(`Msg "missing field \"rank_scores\"")
+                     (!rank_scores)
+                  in
+                 let* rank_name =
+                   Option.to_result ~none:(`Msg "missing field \"rank_name\"")
+                     (!rank_name)
+                  in Ok { rank_name; rank_scores })
       let _ = deserialize_rank
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
   type t =
@@ -167,29 +199,101 @@
           fun ctx ->
             record ctx "t" 7
               (fun ctx ->
-                 let* name = field ctx "name" string
+                 let field_visitor =
+                   let visit_string _ctx str =
+                     match str with
+                     | "value" -> Ok `value
+                     | "rank" -> Ok `rank
+                     | "keywords" -> Ok `keywords
+                     | "credits" -> Ok `credits
+                     | "updated_at" -> Ok `updated_at
+                     | "commisioned" -> Ok `commisioned
+                     | "name" -> Ok `name
+                     | _ -> Error `invalid_tag in
+                   let visit_int _ctx str =
+                     match str with
+                     | 0 -> Ok `value
+                     | 1 -> Ok `rank
+                     | 2 -> Ok `keywords
+                     | 3 -> Ok `credits
+                     | 4 -> Ok `updated_at
+                     | 5 -> Ok `commisioned
+                     | 6 -> Ok `name
+                     | _ -> Error `invalid_tag in
+                   Visitor.make ~visit_string ~visit_int () in
+                 let name = ref None in
+                 let commisioned = ref None in
+                 let updated_at = ref None in
+                 let credits = ref None in
+                 let keywords = ref None in
+                 let rank = ref None in
+                 let value = ref None in
+                 let rec read_fields () =
+                   let* tag = next_field ctx field_visitor
+                    in
+                   match tag with
+                   | Some `value ->
+                       let* v = field ctx "value" float
+                        in (value := (Some v); read_fields ())
+                   | Some `rank ->
+                       let* v = field ctx "rank" (d deserialize_rank)
+                        in (rank := (Some v); read_fields ())
+                   | Some `keywords ->
+                       let* v = field ctx "keywords" (d (array string))
+                        in (keywords := (Some v); read_fields ())
+                   | Some `credits ->
+                       let* v = field ctx "credits" (d (option int32))
+                        in (credits := (Some v); read_fields ())
+                   | Some `updated_at ->
+                       let* v = field ctx "updated_at" int64
+                        in (updated_at := (Some v); read_fields ())
+                   | Some `commisioned ->
+                       let* v = field ctx "commisioned" bool
+                        in (commisioned := (Some v); read_fields ())
+                   | Some `name ->
+                       let* v = field ctx "name" string
+                        in (name := (Some v); read_fields ())
+                   | None -> Ok () in
+                 let* () = read_fields ()
                   in
-                 let* commisioned = field ctx "commisioned" bool
+                 let* name =
+                   Option.to_result ~none:(`Msg "missing field \"name\"")
+                     (!name)
                   in
-                 let* updated_at = field ctx "updated_at" int64
+                 let* commisioned =
+                   Option.to_result
+                     ~none:(`Msg "missing field \"commisioned\"")
+                     (!commisioned)
                   in
-                 let* credits = field ctx "credits" (d (option int32))
+                 let* updated_at =
+                   Option.to_result ~none:(`Msg "missing field \"updated_at\"")
+                     (!updated_at)
                   in
-                 let* keywords = field ctx "keywords" (d (array string))
+                 let* credits =
+                   Option.to_result ~none:(`Msg "missing field \"credits\"")
+                     (!credits)
                   in
-                 let* rank = field ctx "rank" (d deserialize_rank)
+                 let* keywords =
+                   Option.to_result ~none:(`Msg "missing field \"keywords\"")
+                     (!keywords)
                   in
-                 let* value = field ctx "value" float
+                 let* rank =
+                   Option.to_result ~none:(`Msg "missing field \"rank\"")
+                     (!rank)
+                  in
+                 let* value =
+                   Option.to_result ~none:(`Msg "missing field \"value\"")
+                     (!value)
                   in
                  Ok
                    {
-                     name;
-                     commisioned;
-                     updated_at;
-                     credits;
-                     keywords;
+                     value;
                      rank;
-                     value
+                     keywords;
+                     credits;
+                     updated_at;
+                     commisioned;
+                     name
                    })
       let _ = deserialize_t
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
@@ -219,7 +323,28 @@
           fun ctx ->
             record ctx "t_list" 1
               (fun ctx ->
-                 let* stuff = field ctx "stuff" (d (list (d deserialize_t)))
+                 let field_visitor =
+                   let visit_string _ctx str =
+                     match str with
+                     | "stuff" -> Ok `stuff
+                     | _ -> Error `invalid_tag in
+                   let visit_int _ctx str =
+                     match str with | 0 -> Ok `stuff | _ -> Error `invalid_tag in
+                   Visitor.make ~visit_string ~visit_int () in
+                 let stuff = ref None in
+                 let rec read_fields () =
+                   let* tag = next_field ctx field_visitor
+                    in
+                   match tag with
+                   | Some `stuff ->
+                       let* v = field ctx "stuff" (d (list (d deserialize_t)))
+                        in (stuff := (Some v); read_fields ())
+                   | None -> Ok () in
+                 let* () = read_fields ()
+                  in
+                 let* stuff =
+                   Option.to_result ~none:(`Msg "missing field \"stuff\"")
+                     (!stuff)
                   in Ok { stuff })
       let _ = deserialize_t_list
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
@@ -395,10 +520,43 @@ Now we test the variants:
                        (fun ~size ->
                           fun ctx ->
                             ignore size;
-                            (let* name = field ctx "name" string
+                            (let field_visitor =
+                               let visit_string _ctx str =
+                                 match str with
+                                 | "ship" -> Ok `ship
+                                 | "name" -> Ok `name
+                                 | _ -> Error `invalid_tag in
+                               let visit_int _ctx str =
+                                 match str with
+                                 | 0 -> Ok `ship
+                                 | 1 -> Ok `name
+                                 | _ -> Error `invalid_tag in
+                               Visitor.make ~visit_string ~visit_int () in
+                             let name = ref None in
+                             let ship = ref None in
+                             let rec read_fields () =
+                               let* tag = next_field ctx field_visitor
+                                in
+                               match tag with
+                               | Some `ship ->
+                                   let* v = field ctx "ship" string
+                                    in (ship := (Some v); read_fields ())
+                               | Some `name ->
+                                   let* v = field ctx "name" string
+                                    in (name := (Some v); read_fields ())
+                               | None -> Ok () in
+                             let* () = read_fields ()
                               in
-                             let* ship = field ctx "ship" string
-                              in Ok (Captain { name; ship })))
+                             let* name =
+                               Option.to_result
+                                 ~none:(`Msg "missing field \"name\"") (
+                                 !name)
+                              in
+                             let* ship =
+                               Option.to_result
+                                 ~none:(`Msg "missing field \"ship\"") (
+                                 !ship)
+                              in Ok (Captain { ship; name })))
                  | `Commander ->
                      tuple_variant ctx 3
                        (fun ~size ->
