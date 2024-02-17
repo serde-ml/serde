@@ -170,6 +170,8 @@ module Serde_bin = struct
     let deserialize_field self _state ~name:_ element =
       De.deserialize self element
 
+    let deserialize_key _self _state _visitor = Ok None
+
     let deserialize_identifier self _state visitor =
       let* str = De.deserialize_int31 self in
       Visitor.visit_int self visitor str
