@@ -202,14 +202,39 @@ let _serde_json_roundtrip_tests =
     Ser.(
       serializer @@ fun r ctx ->
       record ctx "simple_record" 2 @@ fun ctx ->
-      let* () = field ctx "name" (string r.name) in
       let* () = field ctx "year" (int r.year) in
+      let* () = field ctx "name" (string r.name) in
       Ok ())
     De.(
       deserializer @@ fun ctx ->
       record ctx "record" 2 @@ fun ctx ->
-      let* name = field ctx "name" string in
-      let* year = field ctx "year" int in
+      let name = ref None in
+      let year = ref None in
+      let field_visitor =
+        Visitor.make
+          ~visit_string:(fun _ctx str ->
+            match str with
+            | "name" -> Ok `Name
+            | "year" -> Ok `Year
+            | _ -> Error `invalid_field_type)
+          ()
+      in
+      let rec read_fields () =
+        let* tag = next_field ctx field_visitor in
+        match tag with
+        | Some `Name ->
+            let* v = field ctx "name" string in
+            name := Some v;
+            read_fields ()
+        | Some `Year ->
+            let* v = field ctx "year" int in
+            year := Some v;
+            read_fields ()
+        | None -> Ok ()
+      in
+      let* () = read_fields () in
+      let name = Option.get !name in
+      let year = Option.get !year in
       Ok { name; year })
     { name = "rush"; year = 2112 }
     {|{name="rush";year=2112}|};
@@ -222,7 +247,7 @@ let _serde_json_roundtrip_tests =
       Ok ())
     De.(
       deserializer @@ fun ctx ->
-      let field_visitor =
+      let constructor_visitor =
         Visitor.
           {
             default with
@@ -233,8 +258,18 @@ let _serde_json_roundtrip_tests =
       in
 
       variant ctx "variant_with_many_args" [ "C" ] @@ fun ctx ->
-      let* `C = identifier ctx field_visitor in
+      let* `C = identifier ctx constructor_visitor in
       record_variant ctx 2 @@ fun ~size:_ ctx ->
+      let field_visitor =
+        Visitor.make
+          ~visit_string:(fun _ctx str ->
+            match str with
+            | "is_inline" -> Ok `Is_inline
+            | _ -> Error `invalid_field_type)
+          ()
+      in
+      let* tag = next_field ctx field_visitor in
+      let `Is_inline = Option.get tag in
       let* is_inline = field ctx "is_inline" bool in
       Ok (D { is_inline }))
     (D { is_inline = true })
@@ -254,11 +289,31 @@ let _serde_json_roundtrip_tests =
       let nested_deserializer =
         deserializer @@ fun ctx ->
         record ctx "record_nested" 1 @@ fun ctx ->
+        let field_visitor =
+          Visitor.make
+            ~visit_string:(fun _ctx str ->
+              match str with
+              | "nested_flag" -> Ok `Nested_flag
+              | _ -> Error `invalid_field_type)
+            ()
+        in
+        let* tag = next_field ctx field_visitor in
+        let `Nested_flag = Option.get tag in
         let* nested_flag = field ctx "nested_flag" bool in
         Ok { nested_flag }
       in
       deserializer @@ fun ctx ->
       record ctx "nested" 1 @@ fun _ctx ->
+      let field_visitor =
+        Visitor.make
+          ~visit_string:(fun _ctx str ->
+            match str with
+            | "nested" -> Ok `Nested
+            | _ -> Error `invalid_field_type)
+          ()
+      in
+      let* tag = next_field ctx field_visitor in
+      let `Nested = Option.get tag in
       let* nested = field ctx "nested" (d nested_deserializer) in
       Ok { nested })
     { nested = { nested_flag = false } }
@@ -353,6 +408,16 @@ let _serde_json_roundtrip_tests =
     De.(
       deserializer @@ fun ctx ->
       record ctx "with_nested_option" 1 @@ fun ctx ->
+      let field_visitor =
+        Visitor.make
+          ~visit_string:(fun _ctx str ->
+            match str with
+            | "nested_opt" -> Ok `Nested_opt
+            | _ -> Error `invalid_field_type)
+          ()
+      in
+      let* tag = next_field ctx field_visitor in
+      let `Nested_opt = Option.get tag in
       let* nested_opt = field ctx "nested_opt" option_deserializer in
       Ok { nested_opt })
   in
@@ -363,33 +428,56 @@ let _serde_json_roundtrip_tests =
     { nested_opt = Some "rush" }
     {|({nested_opt=(Some "rush")})|};
 
-  test "record_with_list" pp_record_with_list
+  let serialize_record_with_list =
     Ser.(
       serializer @@ fun r ctx ->
       record ctx "record_with_list" 1 @@ fun ctx ->
       let* () = field ctx "keys" (s (list string) r.keys) in
       field ctx "collection" (string r.collection))
+  in
+
+  let deserialize_record_with_list =
     De.(
       deserializer @@ fun ctx ->
       record ctx "record_with_list" 1 @@ fun ctx ->
-      let* keys = field ctx "keys" (d (list string)) in
-      let* collection = field ctx "collection" string in
+      let keys = ref None in
+      let collection = ref None in
+      let field_visitor =
+        Visitor.make
+          ~visit_string:(fun _ctx str ->
+            match str with
+            | "keys" -> Ok `Keys
+            | "collection" -> Ok `Collection
+            | _ -> Error `invalid_field_type)
+          ()
+      in
+      let rec read_fields () =
+        let* tag = next_field ctx field_visitor in
+        match tag with
+        | Some `Keys ->
+            let* v = field ctx "keys" (d (list string)) in
+            keys := Some v;
+            read_fields ()
+        | Some `Collection ->
+            let* v = field ctx "collection" string in
+            collection := Some v;
+            read_fields ()
+        | None -> Ok ()
+      in
+      let* () = read_fields () in
+      let keys = Option.get !keys in
+      let collection = Option.get !collection in
+
       Ok { keys; collection })
+  in
+
+  test "record_with_list" pp_record_with_list serialize_record_with_list
+    deserialize_record_with_list
     { keys = [ "rush"; "genesis"; "foo fighters" ]; collection = "bands" }
     {|{keys=["rush"; "genesis"; "foo fighters"];collection="bands"}|};
 
-  test "record_with_list/empty" pp_record_with_list
-    Ser.(
-      serializer @@ fun r ctx ->
-      record ctx "record_with_list" 1 @@ fun ctx ->
-      let* () = field ctx "keys" (s (list string) r.keys) in
-      field ctx "collection" (string r.collection))
-    De.(
-      deserializer @@ fun ctx ->
-      record ctx "record_with_list" 1 @@ fun ctx ->
-      let* keys = field ctx "keys" (d (list string)) in
-      let* collection = field ctx "collection" string in
-      Ok { keys; collection })
+  test "record_with_list/empty" pp_record_with_list serialize_record_with_list
+    deserialize_record_with_list
     { keys = []; collection = "bands" }
     {|{keys=[];collection="bands"}|};
   ()

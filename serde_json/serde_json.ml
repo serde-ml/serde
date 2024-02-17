@@ -7,7 +7,9 @@ module Json = struct
     type t = { yojson : Yojson.lexer_state; lexbuf : Lexing.lexbuf }
 
     let debug t =
-      Printf.printf "buff:\n`%s`\n" (Bytes.unsafe_to_string t.lexbuf.lex_buffer)
+      let buf = Bytes.unsafe_to_string t.lexbuf.lex_buffer in
+      let padding = " " ^ String.make t.lexbuf.lex_curr_pos ' ' ^ "^" in
+      Printf.printf "buff:\n`%s`\n%s\n" buf padding
 
     let of_string string =
       { yojson = Yojson.init_lexer (); lexbuf = Lexing.from_string string }
@@ -271,16 +273,26 @@ module Deserializer = struct
         Parser.skip_space reader;
         let* () = Parser.read_object_end reader in
         Ok value
-    | _ -> assert false
+    | Some c -> failwith (Format.sprintf "what: %c" c)
+    | None -> failwith "unexpected eof"
 
-  let deserialize_field self s ~name de =
-    let* () = if s.kind = First then Ok () else Parser.read_comma s.reader in
-    s.kind <- Rest;
-    let* field_name = Parser.read_string s.reader in
-    if String.equal field_name name then
-      let* () = Parser.read_colon s.reader in
-      De.deserialize self de
-    else Error `invalid_field_type
+  let deserialize_key self s visitor =
+    Parser.skip_space s.reader;
+    match Parser.peek s.reader with
+    | Some '}' -> Ok None
+    | _ ->
+        let* () =
+          if s.kind = First then Ok () else Parser.read_comma s.reader
+        in
+        s.kind <- Rest;
+        let* str = De.deserialize_string self in
+        let* key = Visitor.visit_string self visitor str in
+        let* () = Parser.read_colon s.reader in
+        Ok (Some key)
+
+  let deserialize_field self s ~name:_ de =
+    Parser.skip_space s.reader;
+    De.deserialize self de
 end
 
 let to_string ser value =
