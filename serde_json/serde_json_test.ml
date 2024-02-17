@@ -6,7 +6,7 @@ let error fmt = Spices.(default |> fg (color "#FF0000") |> build) fmt
 
 type simple_variant = A
 type variant_with_arg = B of int
-type variant_with_many_args = C of int32 * string
+type variant_with_many_args = C of int32 * string * float
 type simple_record = { name : string; year : int }
 type variant_with_inline_record = D of { is_inline : bool }
 type nested = { nested_flag : bool }
@@ -20,8 +20,8 @@ type with_array = string array
 let pp_variant fmt A = Format.fprintf fmt "A"
 let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i
 
-let pp_variant_with_many_arg fmt (C (i, str)) =
-  Format.fprintf fmt "(C (%ld, %S))" i str
+let pp_variant_with_many_arg fmt (C (i, str, flt)) =
+  Format.fprintf fmt "(C (%ld, %S, %F))" i str flt
 
 let pp_record fmt { name; year } =
   Format.fprintf fmt "{name=%S;year=%d}" name year
@@ -167,10 +167,11 @@ let _serde_json_roundtrip_tests =
 
   test "variant with many args" pp_variant_with_many_arg
     Ser.(
-      serializer @@ fun (C (i, str)) ctx ->
-      tuple_variant ctx "variant_with_many_args" 0 "C" 2 @@ fun ctx ->
+      serializer @@ fun (C (i, str, flt)) ctx ->
+      tuple_variant ctx "variant_with_many_args" 0 "C" 3 @@ fun ctx ->
       let* () = element ctx (int32 i) in
       let* () = element ctx (string str) in
+      let* () = element ctx (float flt) in
       Ok ())
     De.(
       deserializer @@ fun ctx ->
@@ -191,9 +192,11 @@ let _serde_json_roundtrip_tests =
       let i = Option.get i in
       let* str = element ctx string in
       let str = Option.get str in
-      Ok (C (i, str)))
-    (C (Int32.max_int, "rush"))
-    {|(C (2147483647, "rush"))|};
+      let* flt = element ctx float in
+      let flt = Option.get flt in
+      Ok (C (i, str, flt)))
+    (C (Int32.max_int, "rush", Float.pi))
+    {|(C (2147483647, "rush", 3.14159265359))|};
 
   test "record_with_one_arg" pp_record
     Ser.(

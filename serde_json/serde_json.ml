@@ -37,6 +37,9 @@ module Json = struct
     let read_int64 { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_int64 yojson lexbuf)
 
+    let read_float { yojson; lexbuf } =
+      _run (fun () -> Yojson.Safe.read_number yojson lexbuf)
+
     let read_null_if_possible { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_null_if_possible yojson lexbuf)
 
@@ -113,6 +116,9 @@ module Serializer = struct
 
   let serialize_int64 _self (S { fmt; _ }) int =
     Rio.write_all fmt ~buf:(Int64.to_string int)
+
+  let serialize_float _self (S { fmt; _ }) float =
+    Rio.write_all fmt ~buf:(Float.to_string float)
 
   let serialize_none _self (S { fmt; _ }) = Fmt.null fmt
   let serialize_some self _state value = Ser.serialize self value
@@ -194,6 +200,7 @@ module Deserializer = struct
   let deserialize_int31 _self state = Parser.read_int state.reader
   let deserialize_int32 _self state = Parser.read_int32 state.reader
   let deserialize_int64 _self state = Parser.read_int64 state.reader
+  let deserialize_float _self state = Parser.read_float state.reader
   let deserialize_bool _self state = Parser.read_bool state.reader
   let deserialize_string _self state = Parser.read_string state.reader
 

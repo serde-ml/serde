@@ -68,6 +68,9 @@ module rec Ser_base : sig
     val serialize_int64 :
       ('value, state, output) ctx -> state -> int64 -> (output, error) result
 
+    val serialize_float :
+      ('value, state, output) ctx -> state -> float -> (output, error) result
+
     val serialize_string :
       ('value, state, output) ctx -> state -> string -> (output, error) result
 
@@ -183,6 +186,9 @@ end = struct
 
     val serialize_int64 :
       ('value, state, output) ctx -> state -> int64 -> (output, error) result
+
+    val serialize_float :
+      ('value, state, output) ctx -> state -> float -> (output, error) result
 
     val serialize_string :
       ('value, state, output) ctx -> state -> string -> (output, error) result
@@ -347,11 +353,16 @@ module Ser = struct
       (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
     S.serialize_int64 self state int
 
+  let serialize_float (type value state output) float
+      (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
+    S.serialize_float self state float
+
   let int int ctx = serialize_int31 int ctx
   let int8 int ctx = serialize_int8 int ctx
   let int16 int ctx = serialize_int16 int ctx
   let int32 int ctx = serialize_int32 int ctx
   let int64 int ctx = serialize_int64 int ctx
+  let float float ctx = serialize_float float ctx
 
   let string (type value state output) string
       (Ctx (_, (module S), state) as self : (value, state, output) ctx) =
@@ -465,6 +476,7 @@ module rec De_base : sig
     val deserialize_int32 : state ctx -> state -> (int32, error) result
     val deserialize_int64 : state ctx -> state -> (int64, error) result
     val deserialize_bool : state ctx -> state -> (bool, error) result
+    val deserialize_float : state ctx -> state -> (float, error) result
 
     val deserialize_option :
       state ctx -> state -> ('value, state) t -> ('value option, error) result
@@ -553,6 +565,7 @@ end = struct
     val deserialize_int32 : state ctx -> state -> (int32, error) result
     val deserialize_int64 : state ctx -> state -> (int64, error) result
     val deserialize_bool : state ctx -> state -> (bool, error) result
+    val deserialize_float : state ctx -> state -> (float, error) result
 
     val deserialize_option :
       state ctx -> state -> ('value, state) t -> ('value option, error) result
@@ -607,6 +620,9 @@ module De = struct
 
   let deserialize_bool (type state) (((module D), state) as ctx : state ctx) =
     D.deserialize_bool ctx state
+
+  let deserialize_float (type state) (((module D), state) as ctx : state ctx) =
+    D.deserialize_float ctx state
 
   let deserialize_record (type state) (((module D), state) as ctx : state ctx)
       name size de =
@@ -677,6 +693,7 @@ module De = struct
   let element ctx de = deserialize_element ctx de
   let field ctx name de = deserialize_field ctx name de
   let option de ctx = deserialize_option ctx de
+  let float ctx = deserialize_float ctx
 
   let list de ctx =
     sequence ctx @@ fun ~size:_ ctx ->
