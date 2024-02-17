@@ -463,6 +463,12 @@ module rec De_base : sig
       ('value, state) t ->
       ('value, error) result
 
+    val deserialize_key :
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
+      ('value option, error) result
+
     val deserialize_identifier :
       state ctx ->
       state ->
@@ -551,6 +557,12 @@ end = struct
       name:string ->
       ('value, state) t ->
       ('value, error) result
+
+    val deserialize_key :
+      state ctx ->
+      state ->
+      ('value, state, 'tag) visitor ->
+      ('value option, error) result
 
     val deserialize_identifier :
       state ctx ->
@@ -660,6 +672,10 @@ module De = struct
       (((module D), state) as ctx : state ctx) size de =
     D.deserialize_record_variant ctx state ~size de
 
+  let deserialize_key (type state) (((module D), state) as ctx : state ctx)
+      visitor =
+    D.deserialize_key ctx state visitor
+
   let deserialize_identifier (type state)
       (((module D), state) as ctx : state ctx) visitor =
     D.deserialize_identifier ctx state visitor
@@ -692,6 +708,7 @@ module De = struct
   let record_variant ctx size de = deserialize_record_variant ctx size de
   let element ctx de = deserialize_element ctx de
   let field ctx name de = deserialize_field ctx name de
+  let next_field ctx visitor = deserialize_key ctx visitor
   let option de ctx = deserialize_option ctx de
   let float ctx = deserialize_float ctx
 
