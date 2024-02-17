@@ -1,43 +1,44 @@
-type rank = { 
-  rank_scores : string list;
-  rank_name : string; 
-}
+type rank = { rank_scores : string list; rank_name : string }
 [@@deriving serialize, deserialize]
 
-type t = { 
-  name : string; 
+type t = {
+  name : string;
   commisioned : bool;
-  updated_at: int64;
-  credits: int32 option;
-  keywords: string array;
-  rank: rank
+  updated_at : int64;
+  credits : int32 option;
+  keywords : string array;
+  rank : rank;
+  value : float;
 }
 [@@deriving serialize, deserialize]
 
-type t_list = { stuff : t list }
-[@@deriving serialize, deserialize]
+type t_list = { stuff : t list } [@@deriving serialize, deserialize]
 
-let () = 
-  let test_t = { 
-    stuff = [
-      {
-        name = "hello";
-        commisioned = false;
-        updated_at = 9223372036854766L;
-        credits = None;
-        keywords =  [||];
-        rank = { rank_name = "asdf"; rank_scores = ["1";"c";"a"]}
-      };
-      {
-        name = "hello";
-        commisioned = false;
-        updated_at = 0L;
-        credits = Some 2112l;
-        keywords =  [|"hello"|];
-        rank = { rank_name = "asdf"; rank_scores = []}
-      }
-    ]
-  }
+let () =
+  let test_t =
+    {
+      stuff =
+        [
+          {
+            name = "hello";
+            commisioned = false;
+            updated_at = 9223372036854766L;
+            credits = None;
+            keywords = [||];
+            rank = { rank_name = "asdf"; rank_scores = [ "1"; "c"; "a" ] };
+            value = 420.69;
+          };
+          {
+            name = "hello";
+            commisioned = false;
+            updated_at = 0L;
+            credits = Some 2112l;
+            keywords = [| "hello" |];
+            rank = { rank_name = "asdf"; rank_scores = [] };
+            value = Float.pi;
+          };
+        ];
+    }
   in
   let json1 = Serde_json.to_string serialize_t_list test_t |> Result.get_ok in
   let value = Serde_json.of_string deserialize_t_list json1 |> Result.get_ok in
