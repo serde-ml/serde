@@ -1,24 +1,26 @@
 [@@@warning "-37"]
 
-type rank = 
-  | Captain of { name: string; ship: string }
-  | Commander of string * int32
+type rank =
+  | Captain of { name : string; ship : string }
+  | Commander of string * int32 * float
   | Lt of bool option
-  | Ensign 
+  | Ensign
 [@@deriving serialize, deserialize]
 
-type ranks = Ranks of rank list
-[@@deriving serialize, deserialize]
+type ranks = Ranks of rank list [@@deriving serialize, deserialize]
 
-let () = 
-  let test_t = Ranks [
-    Ensign;
-    Commander ("riker", 2112l);
-    Lt None;
-    Lt (Some false);
-    Lt (Some true);
-    Captain { name="janeway"; ship="voyager" }
-] in
+let () =
+  let test_t =
+    Ranks
+      [
+        Ensign;
+        Commander ("riker", 2112l, Float.pi);
+        Lt None;
+        Lt (Some false);
+        Lt (Some true);
+        Captain { name = "janeway"; ship = "voyager" };
+      ]
+  in
   let json1 = Serde_json.to_string serialize_ranks test_t |> Result.get_ok in
   (* Format.printf "%s\n%!" json1 *)
   let value = Serde_json.of_string deserialize_ranks json1 |> Result.get_ok in

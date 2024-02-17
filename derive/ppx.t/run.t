@@ -16,7 +16,8 @@
               "a"
             ],
             "rank_name": "asdf"
-          }
+          },
+          "value": 420.69
         },
         {
           "name": "hello",
@@ -29,7 +30,8 @@
           "rank": {
             "rank_scores": [],
             "rank_name": "asdf"
-          }
+          },
+          "value": 3.14159265359
         }
       ]
     },
@@ -48,7 +50,8 @@
               "a"
             ],
             "rank_name": "asdf"
-          }
+          },
+          "value": 420.69
         },
         {
           "name": "hello",
@@ -61,7 +64,8 @@
           "rank": {
             "rank_scores": [],
             "rank_name": "asdf"
-          }
+          },
+          "value": 3.14159265359
         }
       ]
     }
@@ -126,7 +130,8 @@
     updated_at: int64 ;
     credits: int32 option ;
     keywords: string array ;
-    rank: rank }[@@deriving (serialize, deserialize)]
+    rank: rank ;
+    value: float }[@@deriving (serialize, deserialize)]
   include
     struct
       let _ = fun (_ : t) -> ()
@@ -136,7 +141,7 @@
         let open Serde.Ser in
           fun t ->
             fun ctx ->
-              record ctx "t" 6
+              record ctx "t" 7
                 (fun ctx ->
                    let* () = field ctx "name" (string t.name)
                     in
@@ -150,7 +155,8 @@
                      field ctx "keywords" ((s (array string)) t.keywords)
                     in
                    let* () = field ctx "rank" ((s serialize_rank) t.rank)
-                    in Ok ())
+                    in let* () = field ctx "value" (float t.value)
+                        in Ok ())
       let _ = serialize_t
       open! Serde
       let ( let* ) = Result.bind
@@ -159,7 +165,7 @@
         let ( let* ) = Result.bind in
         let open Serde.De in
           fun ctx ->
-            record ctx "t" 6
+            record ctx "t" 7
               (fun ctx ->
                  let* name = field ctx "name" string
                   in
@@ -173,7 +179,18 @@
                   in
                  let* rank = field ctx "rank" (d deserialize_rank)
                   in
-                 Ok { name; commisioned; updated_at; credits; keywords; rank })
+                 let* value = field ctx "value" float
+                  in
+                 Ok
+                   {
+                     name;
+                     commisioned;
+                     updated_at;
+                     credits;
+                     keywords;
+                     rank;
+                     value
+                   })
       let _ = deserialize_t
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
   type t_list = {
@@ -216,7 +233,8 @@
              updated_at = 9223372036854766L;
              credits = None;
              keywords = [||];
-             rank = { rank_name = "asdf"; rank_scores = ["1"; "c"; "a"] }
+             rank = { rank_name = "asdf"; rank_scores = ["1"; "c"; "a"] };
+             value = 420.69
            };
           {
             name = "hello";
@@ -224,7 +242,8 @@
             updated_at = 0L;
             credits = (Some 2112l);
             keywords = [|"hello"|];
-            rank = { rank_name = "asdf"; rank_scores = [] }
+            rank = { rank_name = "asdf"; rank_scores = [] };
+            value = Float.pi
           }]
       } in
     let json1 = (Serde_json.to_string serialize_t_list test_t) |> Result.get_ok in
@@ -246,7 +265,8 @@ Now we test the variants:
         {
           "Commander": [
             "riker",
-            2112
+            2112,
+            3.14159265359
           ]
         },
         {
@@ -272,7 +292,8 @@ Now we test the variants:
         {
           "Commander": [
             "riker",
-            2112
+            2112,
+            3.14159265359
           ]
         },
         {
@@ -316,7 +337,7 @@ Now we test the variants:
     | Captain of {
     name: string ;
     ship: string } 
-    | Commander of string * int32 
+    | Commander of string * int32 * float 
     | Lt of bool option 
     | Ensign [@@deriving (serialize, deserialize)]
   include
@@ -335,11 +356,13 @@ Now we test the variants:
                        let* () = field ctx "name" (string r.name)
                         in let* () = field ctx "ship" (string r.ship)
                             in Ok ())
-              | Commander (v_1, v_2) ->
-                  tuple_variant ctx "rank" 1 "Commander" 2
+              | Commander (v_1, v_2, v_3) ->
+                  tuple_variant ctx "rank" 1 "Commander" 3
                     (fun ctx ->
                        let* () = element ctx (string v_1)
-                        in let* () = element ctx (int32 v_2)
+                        in
+                       let* () = element ctx (int32 v_2)
+                        in let* () = element ctx (float v_3)
                             in Ok ())
               | Lt v_1 ->
                   newtype_variant ctx "rank" 2 "Lt" ((s (option bool)) v_1)
@@ -377,7 +400,7 @@ Now we test the variants:
                              let* ship = field ctx "ship" string
                               in Ok (Captain { name; ship })))
                  | `Commander ->
-                     tuple_variant ctx 2
+                     tuple_variant ctx 3
                        (fun ~size ->
                           fun ctx ->
                             ignore size;
@@ -392,7 +415,13 @@ Now we test the variants:
                                | Ok (Some v) -> Ok v
                                | Ok (None) -> Error `no_more_data
                                | Error reason -> Error reason
-                              in Ok (Commander (v_1, v_2))))
+                              in
+                             let* v_3 =
+                               match element ctx float with
+                               | Ok (Some v) -> Ok v
+                               | Ok (None) -> Error `no_more_data
+                               | Error reason -> Error reason
+                              in Ok (Commander (v_1, v_2, v_3))))
                  | `Lt ->
                      (newtype_variant ctx) @@
                        ((fun ctx ->
@@ -448,7 +477,7 @@ Now we test the variants:
     let test_t =
       Ranks
         [Ensign;
-        Commander ("riker", 2112l);
+        Commander ("riker", 2112l, Float.pi);
         Lt None;
         Lt (Some false);
         Lt (Some true);

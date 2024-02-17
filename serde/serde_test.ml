@@ -51,6 +51,12 @@ module Serde_bin = struct
       Bytes.set_int64_be bytes 0 int;
       Rio.write_all fmt ~buf:(Bytes.to_string bytes)
 
+    let serialize_float _self (S { fmt; _ }) float =
+      let bytes = Bytes.create 8 in
+      let bof = Int64.bits_of_float float in
+      Bytes.set_int64_be bytes 0 bof;
+      Rio.write_all fmt ~buf:(Bytes.to_string bytes)
+
     let serialize_sequence self (S _) ~size elements =
       let* () = Ser.serialize_int31 size self in
       Ser.serialize self elements
@@ -112,6 +118,10 @@ module Serde_bin = struct
 
     let deserialize_int32 _self state = read_int 4 state Bytes.get_int32_be
     let deserialize_int64 _self state = read_int 8 state Bytes.get_int64_be
+
+    let deserialize_float _self state =
+      let* float = read_int 8 state Bytes.get_int64_be in
+      Ok (Int64.float_of_bits float)
 
     (* let deserialize_none self _state = *)
     (*   let* int = De.deserialize_int8 self in *)
@@ -208,7 +218,7 @@ let error fmt = Spices.(default |> fg (color "#FF0000") |> build) fmt
 
 type simple_variant = A
 type variant_with_arg = B of int
-type variant_with_many_args = C of int * string
+type variant_with_many_args = C of int * string * float
 type simple_record = { name : string; year : int [@warning "-69"] }
 type variant_with_inline_record = D of { is_inline : bool }
 type nested = { nested_flag : bool }
@@ -222,8 +232,8 @@ type with_array = string array
 let pp_variant fmt A = Format.fprintf fmt "A"
 let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i
 
-let pp_variant_with_many_arg fmt (C (i, str)) =
-  Format.fprintf fmt "(C (%d, %S))" i str
+let pp_variant_with_many_arg fmt (C (i, str, float)) =
+  Format.fprintf fmt "(C (%d, %S, %F))" i str float
 
 let pp_record fmt { name; year } =
   Format.fprintf fmt "{name=%S;year=%d}" name year
@@ -368,10 +378,11 @@ let _serde_bin_roundtrip_tests =
 
   test "variant with many args" pp_variant_with_many_arg
     Ser.(
-      serializer @@ fun (C (i, str)) ctx ->
-      tuple_variant ctx "variant_with_many_args" 0 "C" 2 @@ fun ctx ->
+      serializer @@ fun (C (i, str, flt)) ctx ->
+      tuple_variant ctx "variant_with_many_args" 0 "C" 3 @@ fun ctx ->
       let* () = element ctx (int i) in
       let* () = element ctx (string str) in
+      let* () = element ctx (float flt) in
       Ok ())
     De.(
       deserializer @@ fun ctx ->
@@ -386,14 +397,16 @@ let _serde_bin_roundtrip_tests =
 
       variant ctx "variant_with_many_args" [ "C" ] @@ fun ctx ->
       let* `C = identifier ctx field_visitor in
-      tuple_variant ctx 2 @@ fun ~size:_ ctx ->
+      tuple_variant ctx 3 @@ fun ~size:_ ctx ->
       let* i = element ctx int in
       let i = Option.get i in
       let* str = element ctx string in
       let str = Option.get str in
-      Ok (C (i, str)))
-    (C (2112, "rush"))
-    {|(C (2112, "rush"))|};
+      let* flt = element ctx float in
+      let flt = Option.get flt in
+      Ok (C (i, str, flt)))
+    (C (2112, "rush", Float.pi))
+    {|(C (2112, "rush", 3.14159265359))|};
 
   test "record_with_one_arg" pp_record
     Ser.(
