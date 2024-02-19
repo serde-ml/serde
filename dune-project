@@ -1,4 +1,4 @@
-(lang dune 3.14)
+(lang dune 3.13)
 (cram enable)
 
 (name serde)
@@ -23,8 +23,8 @@
    (qcheck :with-test)
    (rio (>= "0.0.8"))
    (spices :with-test)
-   dune
-   ))
+   dune))
+   
 
 (package
  (name serde_derive)
@@ -35,8 +35,8 @@
    (ppx_deriving (>= "5.2.1"))
    (ppxlib (>= "0.28.0"))
    (serde (= :version))
-   dune
-   ))
+   dune))
+   
 
 (package
  (name serde_json)
@@ -50,5 +50,5 @@
    (serde_derive (= :version))
    (spices :with-test)
    (yojson (>= "2.1.0"))
-   dune
-   ))
+   dune))
+   

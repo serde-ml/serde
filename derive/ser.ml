@@ -109,10 +109,12 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
             (fun ctx -> [%e calls])]
     | Pcstr_record labels ->
         let field_count = Ast.eint ~loc (List.length labels) in
+        let labels = List.rev labels in
+        let labels = List.map Attributes.of_field_attributes labels in
         let fields =
           List.map
-            (fun field ->
-              let field_name = Ast.estring ~loc field.pld_name.txt in
+            (fun (field, attr) ->
+              let field_name = Ast.estring ~loc Attributes.(attr.name) in
               let field_access =
                 let field_name = Longident.parse field.pld_name.txt in
                 Ast.pexp_field ~loc (Ast.evar ~loc "r")
@@ -121,7 +123,7 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
               let serializer = serializer_for_type ~ctxt field.pld_type in
               [%expr
                 field ctx [%e field_name] ([%e serializer] [%e field_access])])
-            (List.rev labels)
+            labels
         in
         let fields =
           List.fold_left
@@ -152,18 +154,20 @@ let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
   let field_count = Ast.eint ~loc (List.length label_declarations) in
+  let labels = List.rev label_declarations in
+  let labels = List.map Attributes.of_field_attributes labels in
 
   let fields =
     List.map
-      (fun field ->
-        let field_name = Ast.estring ~loc field.pld_name.txt in
+      (fun (field, attr) ->
+        let field_name = Ast.estring ~loc Attributes.(attr.name) in
         let field_access =
           let field_name = Longident.parse field.pld_name.txt in
           Ast.pexp_field ~loc (Ast.evar ~loc "t") (Loc.make ~loc field_name)
         in
         let serializer = serializer_for_type ~ctxt field.pld_type in
         [%expr field ctx [%e field_name] ([%e serializer] [%e field_access])])
-      (List.rev label_declarations)
+      labels
   in
 
   let fields =

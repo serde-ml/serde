@@ -9,6 +9,7 @@ type t = {
   keywords : string array;
   rank : rank;
   value : float;
+  type_ : string; [@serde { rename = "type" }]
 }
 [@@deriving serialize, deserialize]
 
@@ -27,6 +28,7 @@ let () =
             keywords = [||];
             rank = { rank_name = "asdf"; rank_scores = [ "1"; "c"; "a" ] };
             value = 420.69;
+            type_ = "something";
           };
           {
             name = "hello";
@@ -36,6 +38,7 @@ let () =
             keywords = [| "hello" |];
             rank = { rank_name = "asdf"; rank_scores = [] };
             value = Float.pi;
+            type_ = "something";
           };
         ];
     }

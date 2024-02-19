@@ -7,4 +7,6 @@
  (package serde_json)
  (name serde_json_test)
  (modules serde_json_test)
- (libraries serde_json serde qcheck spices))
+ (libraries serde_json serde qcheck spices)
+ (preprocess
+  (pps serde_derive)))

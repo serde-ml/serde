@@ -138,6 +138,8 @@ module Record_deserializer = struct
   let deserialize_with_unordered_fields ~ctxt labels final_expr =
     let loc = loc ~ctxt in
     let labels = List.rev labels in
+    (* [@serde { rename = "type" }] *)
+    let labels = List.map Attributes.of_field_attributes labels in
 
     (* NOTE(@leostera): Generate the final assembling of the record value
 
@@ -149,7 +151,7 @@ module Record_deserializer = struct
     let record_expr =
       let fields =
         List.map
-          (fun field ->
+          (fun (field, _) ->
             let value = Ast.evar ~loc field.pld_name.txt in
             let field = Longident.parse field.pld_name.txt |> var ~ctxt in
             (field, value))
@@ -169,7 +171,7 @@ module Record_deserializer = struct
     *)
     let field_value_holders body =
       List.fold_left
-        (fun last field ->
+        (fun last (field, _) ->
           let field = Ast.(pvar ~loc field.pld_name.txt) in
           [%expr
             let [%p field] = ref None in
@@ -187,12 +189,14 @@ module Record_deserializer = struct
     *)
     let field_value_unwrapping body =
       List.fold_left
-        (fun last field ->
+        (fun last (field, attr) ->
           let field_var = Ast.(evar ~loc field.pld_name.txt) in
           let field_pat = Ast.(pvar ~loc field.pld_name.txt) in
           let missing_msg =
             Ast.estring ~loc
-              (Format.sprintf "missing field %S" field.pld_name.txt)
+              (Format.sprintf "missing field %S (%S)"
+                 Attributes.(attr.name)
+                 field.pld_name.txt)
           in
           [%expr
             let* [%p field_pat] =
@@ -224,8 +228,8 @@ module Record_deserializer = struct
       let visit_string =
         let cases =
           List.map
-            (fun field ->
-              let lhs = Ast.pstring ~loc field.pld_name.txt in
+            (fun (field, attr) ->
+              let lhs = Ast.pstring ~loc Attributes.(attr.name) in
               let rhs =
                 let tag = Ast.pexp_variant ~loc field.pld_name.txt None in
                 [%expr Ok [%e tag]]
@@ -244,7 +248,7 @@ module Record_deserializer = struct
       let visit_int =
         let cases =
           List.mapi
-            (fun idx field ->
+            (fun idx (field, _) ->
               let lhs = Ast.pint ~loc idx in
               let rhs =
                 let tag = Ast.pexp_variant ~loc field.pld_name.txt None in
@@ -273,7 +277,7 @@ module Record_deserializer = struct
     let declare_read_fields next =
       let cases =
         List.mapi
-          (fun _idx (label : Parsetree.label_declaration) ->
+          (fun _idx (label, attrs) ->
             let lhs =
               let tag = Ast.ppat_variant ~loc label.pld_name.txt None in
               Ast.ppat_construct ~loc
@@ -281,7 +285,8 @@ module Record_deserializer = struct
                 (Some tag)
             in
             let rhs =
-              let field_name = Ast.estring ~loc label.pld_name.txt in
+              (* let field_name = Ast.estring ~loc label.pld_name.txt in *)
+              let field_name = Ast.estring ~loc Attributes.(attrs.name) in
               let field_var = Ast.(evar ~loc label.pld_name.txt) in
               let deserializer = deserializer_for_type ~ctxt label.pld_type in
               let assign =

@@ -17,7 +17,8 @@
             ],
             "rank_name": "asdf"
           },
-          "value": 420.69
+          "value": 420.69,
+          "type": "something"
         },
         {
           "name": "hello",
@@ -31,7 +32,8 @@
             "rank_scores": [],
             "rank_name": "asdf"
           },
-          "value": 3.14159265359
+          "value": 3.14159265359,
+          "type": "something"
         }
       ]
     },
@@ -51,7 +53,8 @@
             ],
             "rank_name": "asdf"
           },
-          "value": 420.69
+          "value": 420.69,
+          "type": "something"
         },
         {
           "name": "hello",
@@ -65,7 +68,8 @@
             "rank_scores": [],
             "rank_name": "asdf"
           },
-          "value": 3.14159265359
+          "value": 3.14159265359,
+          "type": "something"
         }
       ]
     }
@@ -146,11 +150,13 @@
                   in
                  let* rank_scores =
                    Option.to_result
-                     ~none:(`Msg "missing field \"rank_scores\"")
+                     ~none:(`Msg
+                              "missing field \"rank_scores\" (\"rank_scores\")")
                      (!rank_scores)
                   in
                  let* rank_name =
-                   Option.to_result ~none:(`Msg "missing field \"rank_name\"")
+                   Option.to_result
+                     ~none:(`Msg "missing field \"rank_name\" (\"rank_name\")")
                      (!rank_name)
                   in Ok { rank_name; rank_scores })
       let _ = deserialize_rank
@@ -163,7 +169,9 @@
     credits: int32 option ;
     keywords: string array ;
     rank: rank ;
-    value: float }[@@deriving (serialize, deserialize)]
+    value: float ;
+    type_: string [@serde { rename = "type" }]}[@@deriving
+                                                 (serialize, deserialize)]
   include
     struct
       let _ = fun (_ : t) -> ()
@@ -173,7 +181,7 @@
         let open Serde.Ser in
           fun t ->
             fun ctx ->
-              record ctx "t" 7
+              record ctx "t" 8
                 (fun ctx ->
                    let* () = field ctx "name" (string t.name)
                     in
@@ -187,7 +195,9 @@
                      field ctx "keywords" ((s (array string)) t.keywords)
                     in
                    let* () = field ctx "rank" ((s serialize_rank) t.rank)
-                    in let* () = field ctx "value" (float t.value)
+                    in
+                   let* () = field ctx "value" (float t.value)
+                    in let* () = field ctx "type" (string t.type_)
                         in Ok ())
       let _ = serialize_t
       open! Serde
@@ -197,11 +207,12 @@
         let ( let* ) = Result.bind in
         let open Serde.De in
           fun ctx ->
-            record ctx "t" 7
+            record ctx "t" 8
               (fun ctx ->
                  let field_visitor =
                    let visit_string _ctx str =
                      match str with
+                     | "type" -> Ok `type_
                      | "value" -> Ok `value
                      | "rank" -> Ok `rank
                      | "keywords" -> Ok `keywords
@@ -212,13 +223,14 @@
                      | _ -> Error `invalid_tag in
                    let visit_int _ctx str =
                      match str with
-                     | 0 -> Ok `value
-                     | 1 -> Ok `rank
-                     | 2 -> Ok `keywords
-                     | 3 -> Ok `credits
-                     | 4 -> Ok `updated_at
-                     | 5 -> Ok `commisioned
-                     | 6 -> Ok `name
+                     | 0 -> Ok `type_
+                     | 1 -> Ok `value
+                     | 2 -> Ok `rank
+                     | 3 -> Ok `keywords
+                     | 4 -> Ok `credits
+                     | 5 -> Ok `updated_at
+                     | 6 -> Ok `commisioned
+                     | 7 -> Ok `name
                      | _ -> Error `invalid_tag in
                    Visitor.make ~visit_string ~visit_int () in
                  let name = ref None in
@@ -228,10 +240,14 @@
                  let keywords = ref None in
                  let rank = ref None in
                  let value = ref None in
+                 let type_ = ref None in
                  let rec read_fields () =
                    let* tag = next_field ctx field_visitor
                     in
                    match tag with
+                   | Some `type_ ->
+                       let* v = field ctx "type" string
+                        in (type_ := (Some v); read_fields ())
                    | Some `value ->
                        let* v = field ctx "value" float
                         in (value := (Some v); read_fields ())
@@ -257,36 +273,50 @@
                  let* () = read_fields ()
                   in
                  let* name =
-                   Option.to_result ~none:(`Msg "missing field \"name\"")
-                     (!name)
+                   Option.to_result
+                     ~none:(`Msg "missing field \"name\" (\"name\")") (
+                     !name)
                   in
                  let* commisioned =
                    Option.to_result
-                     ~none:(`Msg "missing field \"commisioned\"")
+                     ~none:(`Msg
+                              "missing field \"commisioned\" (\"commisioned\")")
                      (!commisioned)
                   in
                  let* updated_at =
-                   Option.to_result ~none:(`Msg "missing field \"updated_at\"")
+                   Option.to_result
+                     ~none:(`Msg
+                              "missing field \"updated_at\" (\"updated_at\")")
                      (!updated_at)
                   in
                  let* credits =
-                   Option.to_result ~none:(`Msg "missing field \"credits\"")
+                   Option.to_result
+                     ~none:(`Msg "missing field \"credits\" (\"credits\")")
                      (!credits)
                   in
                  let* keywords =
-                   Option.to_result ~none:(`Msg "missing field \"keywords\"")
+                   Option.to_result
+                     ~none:(`Msg "missing field \"keywords\" (\"keywords\")")
                      (!keywords)
                   in
                  let* rank =
-                   Option.to_result ~none:(`Msg "missing field \"rank\"")
-                     (!rank)
+                   Option.to_result
+                     ~none:(`Msg "missing field \"rank\" (\"rank\")") (
+                     !rank)
                   in
                  let* value =
-                   Option.to_result ~none:(`Msg "missing field \"value\"")
+                   Option.to_result
+                     ~none:(`Msg "missing field \"value\" (\"value\")")
                      (!value)
+                  in
+                 let* type_ =
+                   Option.to_result
+                     ~none:(`Msg "missing field \"type\" (\"type_\")") (
+                     !type_)
                   in
                  Ok
                    {
+                     type_;
                      value;
                      rank;
                      keywords;
@@ -343,7 +373,8 @@
                  let* () = read_fields ()
                   in
                  let* stuff =
-                   Option.to_result ~none:(`Msg "missing field \"stuff\"")
+                   Option.to_result
+                     ~none:(`Msg "missing field \"stuff\" (\"stuff\")")
                      (!stuff)
                   in Ok { stuff })
       let _ = deserialize_t_list
@@ -359,7 +390,8 @@
              credits = None;
              keywords = [||];
              rank = { rank_name = "asdf"; rank_scores = ["1"; "c"; "a"] };
-             value = 420.69
+             value = 420.69;
+             type_ = "something"
            };
           {
             name = "hello";
@@ -368,7 +400,8 @@
             credits = (Some 2112l);
             keywords = [|"hello"|];
             rank = { rank_name = "asdf"; rank_scores = [] };
-            value = Float.pi
+            value = Float.pi;
+            type_ = "something"
           }]
       } in
     let json1 = (Serde_json.to_string serialize_t_list test_t) |> Result.get_ok in
@@ -549,13 +582,15 @@ Now we test the variants:
                               in
                              let* name =
                                Option.to_result
-                                 ~none:(`Msg "missing field \"name\"") (
-                                 !name)
+                                 ~none:(`Msg
+                                          "missing field \"name\" (\"name\")")
+                                 (!name)
                               in
                              let* ship =
                                Option.to_result
-                                 ~none:(`Msg "missing field \"ship\"") (
-                                 !ship)
+                                 ~none:(`Msg
+                                          "missing field \"ship\" (\"ship\")")
+                                 (!ship)
                               in Ok (Captain { ship; name })))
                  | `Commander ->
                      tuple_variant ctx 3
