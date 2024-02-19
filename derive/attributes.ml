@@ -1,3 +1,5 @@
+open Ppxlib
+
 type type_attributes = {
   rename : string;
   mode :
@@ -26,7 +28,7 @@ type variant_attributes = {
 
 type field_attributes = {
   name : string;
-  default : string option;
+  presence : [ `required | `optional | `with_default of Parsetree.expression ];
   should_skip :
     [ `skip_serializing_if of string
     | `skip_deserializing_if of string
@@ -37,8 +39,13 @@ type field_attributes = {
 let of_field_attributes lbl =
   let open Ppxlib in
   let name = ref lbl.pld_name.txt in
-  let default = ref None in
   let should_skip = ref `never in
+  let presence =
+    ref
+      (match lbl.pld_type.ptyp_desc with
+      | Ptyp_constr ({ txt = Lident "option"; _ }, _) -> `optional
+      | _ -> `required)
+  in
   let () =
     match lbl.pld_attributes with
     | [
@@ -63,9 +70,12 @@ let of_field_attributes lbl =
                 { pexp_desc = Pexp_constant (Pconst_string (s, _, _)); _ } ) ->
                 name := s;
                 ()
+            | { txt = Lident "default"; _ }, expr ->
+                presence := `with_default expr;
+                ()
             | _ -> ())
           fields
     | _ -> ()
   in
 
-  (lbl, { name = !name; default = !default; should_skip = !should_skip })
+  (lbl, { name = !name; presence = !presence; should_skip = !should_skip })

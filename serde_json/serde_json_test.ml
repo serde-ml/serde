@@ -1,5 +1,4 @@
 open Serde
-open Serde_json
 
 let keyword fmt = Spices.(default |> fg (color "#00FF00") |> build) fmt
 let error fmt = Spices.(default |> fg (color "#FF0000") |> build) fmt
@@ -488,4 +487,35 @@ let _serde_json_roundtrip_tests =
 
   test "record_with_key_rename" pp_with_type_field serialize_with_type_field
     deserialize_with_type_field { type_ = "hello" } {|{type="hello"}|};
+
+  ()
+
+type hello = { hello : string; count : int option }
+[@@deriving serialize, deserialize]
+
+let _serde_json_parse_test_no_key =
+  let str = {| {"hello":"world"} |} in
+  let parsed = Serde_json.of_string deserialize_hello str in
+  match parsed with
+  | Ok _ ->
+      Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with no key"
+        (keyword "OK")
+  | Error _ ->
+      Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with no key"
+        (error "Failed!");
+      assert false
+
+type with_default = {
+  greeting : string;
+  count_with_default : int; [@serde { default = 5 }]
+}
+[@@deriving serialize, deserialize]
+
+let _serde_json_parse_test_with_default =
+  let str = {| {"greeting":"yoyo"} |} in
+  let parsed = Serde_json.of_string deserialize_with_default str in
+  let parsed = Result.get_ok parsed in
+  assert (parsed.count_with_default = 5);
+  Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with default"
+    (keyword "OK");
   ()

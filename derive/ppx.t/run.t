@@ -289,11 +289,8 @@
                               "missing field \"updated_at\" (\"updated_at\")")
                      (!updated_at)
                   in
-                 let* credits =
-                   Option.to_result
-                     ~none:(`Msg "missing field \"credits\" (\"credits\")")
-                     (!credits)
-                  in
+                 let credits =
+                   match !credits with | Some opt -> opt | None -> None in
                  let* keywords =
                    Option.to_result
                      ~none:(`Msg "missing field \"keywords\" (\"keywords\")")

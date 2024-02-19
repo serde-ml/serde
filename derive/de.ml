@@ -138,7 +138,6 @@ module Record_deserializer = struct
   let deserialize_with_unordered_fields ~ctxt labels final_expr =
     let loc = loc ~ctxt in
     let labels = List.rev labels in
-    (* [@serde { rename = "type" }] *)
     let labels = List.map Attributes.of_field_attributes labels in
 
     (* NOTE(@leostera): Generate the final assembling of the record value
@@ -198,11 +197,27 @@ module Record_deserializer = struct
                  Attributes.(attr.name)
                  field.pld_name.txt)
           in
-          [%expr
-            let* [%p field_pat] =
-              Option.to_result ~none:(`Msg [%e missing_msg]) ![%e field_var]
-            in
-            [%e last]])
+          match Attributes.(attr.presence) with
+          | `required ->
+              [%expr
+                let* [%p field_pat] =
+                  Option.to_result ~none:(`Msg [%e missing_msg]) ![%e field_var]
+                in
+                [%e last]]
+          | `optional ->
+              [%expr
+                let [%p field_pat] =
+                  match ![%e field_var] with Some opt -> opt | None -> None
+                in
+                [%e last]]
+          | `with_default str ->
+              [%expr
+                let [%p field_pat] =
+                  match ![%e field_var] with
+                  | Some opt -> opt
+                  | None -> [%e str]
+                in
+                [%e last]])
         body labels
     in
 
