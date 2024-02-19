@@ -30,6 +30,12 @@ let is_primitive = function
       true
   | _ -> false
 
+(** [deserializer_for_type] creates a call to a deserializer based on a type.
+
+    When type is a constructor (or [Ptyp_constr], which is OCaml for "any type name"),
+    we will look at the number of arguments it has and 
+
+*)
 let rec deserializer_for_type ~ctxt (core_type : Parsetree.core_type) =
   let loc = loc ~ctxt in
   match core_type.ptyp_desc with
@@ -330,7 +336,7 @@ module Record_deserializer = struct
     @@ record_expr
 end
 
-let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
+let gen_deserialize_variant_impl ~ctxt ptype_name cstr_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
   let constructor_names =
@@ -470,7 +476,11 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
     let* tag = identifier ctx field_visitor in
     [%e tag_dispatch]]
 
-let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
+(** Generate the deserializer function for a record type. 
+
+    See [Record_deserializer] above for more info.
+*)
+let gen_deserialize_record_impl ~ctxt ptype_name label_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
   let field_count = Ast.eint ~loc (List.length label_declarations) in
@@ -483,7 +493,10 @@ let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
 
   [%expr record ctx [%e type_name] [%e field_count] (fun ctx -> [%e body])]
 
-let gen_serialize_impl ~ctxt type_decl =
+(** Generates a deserializer implementation dispatching based on the kind of
+  type that the [@@deriving] attribute was set on.
+*)
+let gen_deserialize_impl ~ctxt type_decl =
   let loc = loc ~ctxt in
 
   let typename = type_decl.ptype_name.txt in
@@ -491,9 +504,9 @@ let gen_serialize_impl ~ctxt type_decl =
   let body =
     match type_decl with
     | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
-        gen_serialize_record_impl ~ctxt ptype_name label_declarations
+        gen_deserialize_record_impl ~ctxt ptype_name label_declarations
     | { ptype_kind = Ptype_variant cstrs_declaration; ptype_name; _ } ->
-        gen_serialize_variant_impl ~ctxt ptype_name cstrs_declaration
+        gen_deserialize_variant_impl ~ctxt ptype_name cstrs_declaration
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with
@@ -516,7 +529,7 @@ let gen_serialize_impl ~ctxt type_decl =
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
   let loc = loc ~ctxt in
   [ [%stri open! Serde]; [%stri let ( let* ) = Result.bind] ]
-  @ List.map (gen_serialize_impl ~ctxt) type_declarations
+  @ List.map (gen_deserialize_impl ~ctxt) type_declarations
 
 let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
 
