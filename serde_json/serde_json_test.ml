@@ -17,6 +17,9 @@ type with_nested_option = { nested_opt : with_option }
 type with_list = string list
 type with_array = string array
 
+type with_type_field = { type_ : string [@serde { rename = "type" }] }
+[@@deriving serialize, deserialize]
+
 let pp_variant fmt A = Format.fprintf fmt "A"
 let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i
 
@@ -55,6 +58,8 @@ let pp_with_array fmt (t : with_array) =
     (fun fmt s -> Format.fprintf fmt "%S" s)
     fmt t;
   Format.fprintf fmt "|]"
+
+let pp_with_type_field fmt { type_ } = Format.fprintf fmt "{type=%S}" type_
 
 let pp_record_with_list fmt { keys; collection } =
   Format.fprintf fmt "{keys=%a;collection=%S}" pp_with_list keys collection
@@ -480,4 +485,7 @@ let _serde_json_roundtrip_tests =
     deserialize_record_with_list
     { keys = []; collection = "bands" }
     {|{keys=[];collection="bands"}|};
+
+  test "record_with_key_rename" pp_with_type_field serialize_with_type_field
+    deserialize_with_type_field { type_ = "hello" } {|{type="hello"}|};
   ()

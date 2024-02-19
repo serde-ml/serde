@@ -15,7 +15,7 @@ depends: [
   "serde_derive" {= version}
   "spices" {with-test}
   "yojson" {>= "2.1.0"}
-  "dune" {>= "3.14"}
+  "dune" {>= "3.13"}
   "odoc" {with-doc}
 ]
 build: [
