@@ -58,7 +58,8 @@ let rec serializer_for_type ~ctxt (core_type : Parsetree.core_type) =
 
 (** implementation *)
 
-let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
+let gen_serialize_variant_impl ~ctxt ptype_name type_attributes
+    cstr_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
 
@@ -110,7 +111,9 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
     | Pcstr_record labels ->
         let field_count = Ast.eint ~loc (List.length labels) in
         let labels = List.rev labels in
-        let labels = List.map Attributes.of_field_attributes labels in
+        let labels =
+          List.map (Attributes.of_field_attributes type_attributes) labels
+        in
         let fields =
           List.map
             (fun (field, attr) ->
@@ -150,12 +153,15 @@ let gen_serialize_variant_impl ~ctxt ptype_name cstr_declarations =
 
   Ast.pexp_match ~loc [%expr t] cases
 
-let gen_serialize_record_impl ~ctxt ptype_name label_declarations =
+let gen_serialize_record_impl ~ctxt ptype_name type_attributes
+    label_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
   let field_count = Ast.eint ~loc (List.length label_declarations) in
   let labels = List.rev label_declarations in
-  let labels = List.map Attributes.of_field_attributes labels in
+  let labels =
+    List.map (Attributes.of_field_attributes type_attributes) labels
+  in
 
   let fields =
     List.map
@@ -185,13 +191,18 @@ let gen_serialize_impl ~ctxt type_decl =
   let loc = loc ~ctxt in
 
   let typename = type_decl.ptype_name.txt in
+  let type_attributes =
+    Attributes.of_record_attributes type_decl.ptype_attributes
+  in
 
   let body =
     match type_decl with
     | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
-        gen_serialize_record_impl ~ctxt ptype_name label_declarations
+        gen_serialize_record_impl ~ctxt ptype_name type_attributes
+          label_declarations
     | { ptype_kind = Ptype_variant cstrs_declaration; ptype_name; _ } ->
-        gen_serialize_variant_impl ~ctxt ptype_name cstrs_declaration
+        gen_serialize_variant_impl ~ctxt ptype_name type_attributes
+          cstrs_declaration
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with

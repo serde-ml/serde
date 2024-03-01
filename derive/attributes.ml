@@ -39,6 +39,7 @@ type field_attributes = {
 (* deserialize_ignored_any *)
 let of_record_attributes attributes =
   (* Field defaults *)
+  let rename_all = ref None in
   let deny_unknown_fields = ref false in
   (* Retrieve fields *)
   let serde_attr =
@@ -61,6 +62,28 @@ let of_record_attributes attributes =
                   deny_unknown_fields := true
               | { txt = Lident "deny_unknown_fields"; _ }, [%expr false] ->
                   deny_unknown_fields := false
+              | { txt = Lident "rename_all"; _ }, expr ->
+                  let rename_value =
+                    match expr with
+                    | [%expr "none"] -> None
+                    | [%expr "lowercase"] -> Some `lowercase
+                    | [%expr "UPPERCASE"] -> Some `UPPERCASE
+                    | [%expr "kebab-case"] -> Some `kebab_case
+                    | [%expr "camelCase"] -> Some `camelCase
+                    | [%expr "bestCase"] -> Some `camelCase
+                    | [%expr "PascalCase"] -> Some `PascalCase
+                    | [%expr "snake_case"] -> Some `snake_case
+                    | [%expr "SCREAMING_SNAKE_CASE"] ->
+                        Some `SCREAMING_SNAKE_CASE
+                    | [%expr "SCREAMING-KEBAB-CASE"] ->
+                        Some `SCREAMING_KEBAB_CASE
+                    | _ ->
+                        failwith
+                          (Format.asprintf
+                             "[ppx_serde] Unknown rename_all value '%a'"
+                             Pprintast.expression expr)
+                  in
+                  rename_all := rename_value
               | { txt = Lident txt; _ }, _ ->
                   failwith
                     (Format.sprintf "[ppx_serde] Unknown attribute %S" txt)
@@ -71,13 +94,46 @@ let of_record_attributes attributes =
   {
     rename = "";
     mode = `normal;
-    rename_all = None;
+    rename_all = !rename_all;
     deny_unknown_fields = !deny_unknown_fields;
   }
 
-let of_field_attributes lbl =
+let pascal_case field =
+  let is_underscore c = c = '_' in
+  let to_uppercase c = Char.uppercase_ascii c in
+  let rec aux chars capitalize acc =
+    match chars with
+    | [] -> List.rev acc
+    | c :: cs when is_underscore c -> aux cs true acc
+    | c :: cs when capitalize -> aux cs false (to_uppercase c :: acc)
+    | c :: cs -> aux cs capitalize (c :: acc)
+  in
+  let chars = String.to_seq field |> List.of_seq in
+  let pascal_list = aux chars true [] in
+  String.of_seq (List.to_seq pascal_list)
+
+let kebab_case field = String.map (function '_' -> '-' | c -> c) field
+
+let of_field_attributes type_attributes lbl =
   let open Ppxlib in
-  let name = ref lbl.pld_name.txt in
+  let name =
+    ref
+      (match type_attributes.rename_all with
+      | Some `lowercase -> String.lowercase_ascii lbl.pld_name.txt
+      | Some `UPPERCASE -> String.uppercase_ascii lbl.pld_name.txt
+      | Some `PascalCase -> pascal_case lbl.pld_name.txt
+      | Some `camelCase ->
+          let pascal = pascal_case lbl.pld_name.txt in
+          let start = String.sub pascal 0 1 |> String.lowercase_ascii in
+          let rest = String.sub pascal 1 (String.length pascal - 1) in
+          start ^ rest
+      | Some `snake_case -> lbl.pld_name.txt
+      | Some `kebab_case -> kebab_case lbl.pld_name.txt
+      | Some `SCREAMING_SNAKE_CASE -> String.uppercase_ascii lbl.pld_name.txt
+      | Some `SCREAMING_KEBAB_CASE ->
+          kebab_case lbl.pld_name.txt |> String.uppercase_ascii
+      | None -> lbl.pld_name.txt)
+  in
   let should_skip = ref `never in
   let presence =
     ref
