@@ -135,7 +135,9 @@ module Record_deserializer = struct
     )
   ]}
 *)
-  let deserialize_with_unordered_fields ~ctxt labels final_expr =
+  let deserialize_with_unordered_fields ~ctxt type_attributes labels final_expr
+      =
+    let open Attributes in
     let loc = loc ~ctxt in
     let labels = List.rev labels in
     let labels = List.map Attributes.of_field_attributes labels in
@@ -240,6 +242,15 @@ module Record_deserializer = struct
        ]}
     *)
     let field_visitor next =
+      let invalid_tag_case =
+        let rhs =
+          match type_attributes.deny_unknown_fields with
+          | true -> [%expr Error `invalid_tag]
+          | false -> [%expr Ok `invalid_tag]
+        in
+        Ast.case ~lhs:(Ast.ppat_any ~loc) ~guard:None ~rhs
+      in
+
       let visit_string =
         let cases =
           List.map
@@ -251,10 +262,7 @@ module Record_deserializer = struct
               in
               Ast.case ~lhs ~rhs ~guard:None)
             labels
-          @ [
-              Ast.case ~lhs:(Ast.ppat_any ~loc) ~guard:None
-                ~rhs:[%expr Error `invalid_tag];
-            ]
+          @ [ invalid_tag_case ]
         in
         let body = Ast.pexp_match ~loc [%expr str] cases in
         [%expr fun _ctx str -> [%e body]]
@@ -271,10 +279,7 @@ module Record_deserializer = struct
               in
               Ast.case ~lhs ~rhs ~guard:None)
             labels
-          @ [
-              Ast.case ~lhs:(Ast.ppat_any ~loc) ~guard:None
-                ~rhs:[%expr Error `invalid_tag];
-            ]
+          @ [ invalid_tag_case ]
         in
         let body = Ast.pexp_match ~loc [%expr str] cases in
         [%expr fun _ctx str -> [%e body]]
@@ -290,6 +295,10 @@ module Record_deserializer = struct
     in
 
     let declare_read_fields next =
+      let invalid_tag_lhs =
+        let tag = Ast.ppat_variant ~loc "invalid_tag" None in
+        Ast.ppat_construct ~loc Longident.(parse "Some" |> var ~ctxt) (Some tag)
+      in
       let cases =
         List.mapi
           (fun _idx (label, attrs) ->
@@ -318,6 +327,11 @@ module Record_deserializer = struct
             Ast.case ~lhs ~guard:None ~rhs)
           labels
         @ [
+            Ast.case ~lhs:invalid_tag_lhs ~guard:None
+              ~rhs:
+                [%expr
+                  let* () = ignore_any ctx in
+                  read_fields ()];
             Ast.case
               ~lhs:
                 (Ast.ppat_construct ~loc
@@ -356,7 +370,8 @@ module Record_deserializer = struct
     @@ record_expr
 end
 
-let gen_deserialize_variant_impl ~ctxt ptype_name cstr_declarations =
+let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
+    cstr_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
   let constructor_names =
@@ -442,7 +457,8 @@ let gen_deserialize_variant_impl ~ctxt ptype_name cstr_declarations =
     | Pcstr_record labels ->
         let field_count = Ast.eint ~loc (List.length labels) in
         let body =
-          Record_deserializer.deserialize_with_unordered_fields ~ctxt labels
+          Record_deserializer.deserialize_with_unordered_fields ~ctxt
+            type_attributes labels
           @@ fun record ->
           let cstr = Ast.pexp_construct ~loc name (Some record) in
           [%expr Ok [%e cstr]]
@@ -500,13 +516,14 @@ let gen_deserialize_variant_impl ~ctxt ptype_name cstr_declarations =
 
     See [Record_deserializer] above for more info.
 *)
-let gen_deserialize_record_impl ~ctxt ptype_name label_declarations =
+let gen_deserialize_record_impl ~ctxt ptype_name type_attributes
+    label_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
   let field_count = Ast.eint ~loc (List.length label_declarations) in
 
   let body =
-    Record_deserializer.deserialize_with_unordered_fields ~ctxt
+    Record_deserializer.deserialize_with_unordered_fields ~ctxt type_attributes
       label_declarations
     @@ fun record -> [%expr Ok [%e record]]
   in
@@ -521,12 +538,18 @@ let gen_deserialize_impl ~ctxt type_decl =
 
   let typename = type_decl.ptype_name.txt in
 
+  let type_attributes =
+    Attributes.of_record_attributes type_decl.ptype_attributes
+  in
+
   let body =
     match type_decl with
     | { ptype_kind = Ptype_record label_declarations; ptype_name; _ } ->
-        gen_deserialize_record_impl ~ctxt ptype_name label_declarations
+        gen_deserialize_record_impl ~ctxt ptype_name type_attributes
+          label_declarations
     | { ptype_kind = Ptype_variant cstrs_declaration; ptype_name; _ } ->
-        gen_deserialize_variant_impl ~ctxt ptype_name cstrs_declaration
+        gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
+          cstrs_declaration
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with

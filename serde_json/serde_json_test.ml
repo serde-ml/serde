@@ -19,6 +19,11 @@ type with_array = string array
 type with_type_field = { type_ : string [@serde { rename = "type" }] }
 [@@deriving serialize, deserialize]
 
+type with_unknown_keys = { known : string } [@@deriving serialize, deserialize]
+
+type deny_unknown_fields = { known : string }
+[@@deriving serialize, deserialize] [@@serde { deny_unknown_fields = true }]
+
 let pp_variant fmt A = Format.fprintf fmt "A"
 let pp_variant_with_arg fmt (B i) = Format.fprintf fmt "(B %d)" i
 
@@ -519,3 +524,36 @@ let _serde_json_parse_test_with_default =
   Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with default"
     (keyword "OK");
   ()
+
+let _serde_json_parse_with_unknown_keys =
+  let str =
+    {| {"first": null, "known": "yoyo", "unknown": true, "last": {"nested": 13, "nested2": false} } |}
+  in
+  let parsed = Serde_json.of_string deserialize_with_unknown_keys str in
+  match parsed with
+  | Ok parsed ->
+      assert (parsed.known = "yoyo");
+      Format.printf "serde_json.ser/de test %S %s\r\n%!"
+        "parsed with unknown keys" (keyword "OK")
+  | Error err ->
+      failwith
+        (Format.sprintf "serde_json.ser/de test %S %s\r\n%!"
+           "parsed with unknown keys"
+           (error "%a" Serde.pp_err err))
+
+let _serde_json_parse_deny_unknown_fields =
+  let str =
+    {| {"first": null, "known":"yoyo", "unknown": true, "last": {"nested": 13, "nested2": false} } |}
+  in
+  let parsed = Serde_json.of_string deserialize_deny_unknown_fields str in
+  match parsed with
+  | Ok parsed ->
+      assert (parsed.known = "yoyo");
+      Format.printf "serde_json.ser/de test %S %s\r\n%!"
+        "parsed with deny unknown keys"
+        (error "Pased but should not have");
+      assert false
+  | Error err ->
+      Format.printf "serde_json.ser/de test %S %s\r\n%!"
+        "parsed with deny unknown keys"
+        (keyword "OK: (found %a)" Serde.pp_err err)

@@ -74,6 +74,10 @@ module Json = struct
     let skip_space { yojson; lexbuf } =
       _run (fun () -> Yojson.Safe.read_space yojson lexbuf) |> ignore;
       ()
+
+    let skip_any { yojson; lexbuf } =
+      _run (fun () -> Yojson.Safe.skip_json yojson lexbuf) |> ignore;
+      ()
   end
 end
 
@@ -285,14 +289,35 @@ module Deserializer = struct
           if s.kind = First then Ok () else Parser.read_comma s.reader
         in
         s.kind <- Rest;
+        Parser.skip_space s.reader;
         let* str = De.deserialize_string self in
+        Parser.skip_space s.reader;
         let* key = Visitor.visit_string self visitor str in
+        Parser.skip_space s.reader;
         let* () = Parser.read_colon s.reader in
+        Parser.skip_space s.reader;
         Ok (Some key)
 
   let deserialize_field self s ~name:_ de =
     Parser.skip_space s.reader;
     De.deserialize self de
+
+  let deserialize_ignored_any _self s =
+    Parser.skip_space s.reader;
+    match Parser.peek s.reader with
+    | Some '}' -> Ok ()
+    | Some ',' ->
+        let* _ = Parser.read_comma s.reader in
+        Parser.skip_space s.reader;
+        let _ = Parser.skip_any s.reader in
+        Parser.skip_space s.reader;
+        Ok ()
+    | Some _ ->
+        Parser.skip_space s.reader;
+        let _ = Parser.skip_any s.reader in
+        Parser.skip_space s.reader;
+        Ok ()
+    | None -> failwith "unexpected eof"
 end
 
 let to_string ser value =

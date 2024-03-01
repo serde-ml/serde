@@ -126,12 +126,12 @@
                      match str with
                      | "rank_name" -> Ok `rank_name
                      | "rank_scores" -> Ok `rank_scores
-                     | _ -> Error `invalid_tag in
+                     | _ -> Ok `invalid_tag in
                    let visit_int _ctx str =
                      match str with
                      | 0 -> Ok `rank_name
                      | 1 -> Ok `rank_scores
-                     | _ -> Error `invalid_tag in
+                     | _ -> Ok `invalid_tag in
                    Visitor.make ~visit_string ~visit_int () in
                  let rank_scores = ref None in
                  let rank_name = ref None in
@@ -145,6 +145,9 @@
                    | Some `rank_scores ->
                        let* v = field ctx "rank_scores" (d (list string))
                         in (rank_scores := (Some v); read_fields ())
+                   | Some `invalid_tag ->
+                       let* () = ignore_any ctx
+                        in read_fields ()
                    | None -> Ok () in
                  let* () = read_fields ()
                   in
@@ -220,7 +223,7 @@
                      | "updated_at" -> Ok `updated_at
                      | "commisioned" -> Ok `commisioned
                      | "name" -> Ok `name
-                     | _ -> Error `invalid_tag in
+                     | _ -> Ok `invalid_tag in
                    let visit_int _ctx str =
                      match str with
                      | 0 -> Ok `type_
@@ -231,7 +234,7 @@
                      | 5 -> Ok `updated_at
                      | 6 -> Ok `commisioned
                      | 7 -> Ok `name
-                     | _ -> Error `invalid_tag in
+                     | _ -> Ok `invalid_tag in
                    Visitor.make ~visit_string ~visit_int () in
                  let name = ref None in
                  let commisioned = ref None in
@@ -269,6 +272,9 @@
                    | Some `name ->
                        let* v = field ctx "name" string
                         in (name := (Some v); read_fields ())
+                   | Some `invalid_tag ->
+                       let* () = ignore_any ctx
+                        in read_fields ()
                    | None -> Ok () in
                  let* () = read_fields ()
                   in
@@ -354,9 +360,9 @@
                    let visit_string _ctx str =
                      match str with
                      | "stuff" -> Ok `stuff
-                     | _ -> Error `invalid_tag in
+                     | _ -> Ok `invalid_tag in
                    let visit_int _ctx str =
-                     match str with | 0 -> Ok `stuff | _ -> Error `invalid_tag in
+                     match str with | 0 -> Ok `stuff | _ -> Ok `invalid_tag in
                    Visitor.make ~visit_string ~visit_int () in
                  let stuff = ref None in
                  let rec read_fields () =
@@ -366,6 +372,9 @@
                    | Some `stuff ->
                        let* v = field ctx "stuff" (d (list (d deserialize_t)))
                         in (stuff := (Some v); read_fields ())
+                   | Some `invalid_tag ->
+                       let* () = ignore_any ctx
+                        in read_fields ()
                    | None -> Ok () in
                  let* () = read_fields ()
                   in
@@ -555,12 +564,12 @@ Now we test the variants:
                                  match str with
                                  | "ship" -> Ok `ship
                                  | "name" -> Ok `name
-                                 | _ -> Error `invalid_tag in
+                                 | _ -> Ok `invalid_tag in
                                let visit_int _ctx str =
                                  match str with
                                  | 0 -> Ok `ship
                                  | 1 -> Ok `name
-                                 | _ -> Error `invalid_tag in
+                                 | _ -> Ok `invalid_tag in
                                Visitor.make ~visit_string ~visit_int () in
                              let name = ref None in
                              let ship = ref None in
@@ -574,6 +583,9 @@ Now we test the variants:
                                | Some `name ->
                                    let* v = field ctx "name" string
                                     in (name := (Some v); read_fields ())
+                               | Some `invalid_tag ->
+                                   let* () = ignore_any ctx
+                                    in read_fields ()
                                | None -> Ok () in
                              let* () = read_fields ()
                               in

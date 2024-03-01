@@ -486,6 +486,8 @@ module rec De_base : sig
 
     val deserialize_option :
       state ctx -> state -> ('value, state) t -> ('value option, error) result
+
+    val deserialize_ignored_any : state ctx -> state -> (unit, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -581,6 +583,8 @@ end = struct
 
     val deserialize_option :
       state ctx -> state -> ('value, state) t -> ('value option, error) result
+
+    val deserialize_ignored_any : state ctx -> state -> (unit, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
@@ -687,6 +691,10 @@ module De = struct
       de =
     D.deserialize_option ctx state de
 
+  let deserialize_ignored_any (type state)
+      (((module D), state) as ctx : state ctx) =
+    D.deserialize_ignored_any ctx state
+
   let record ctx name size de = deserialize_record ctx name size de
 
   let variant ctx name variants visit_variant =
@@ -724,6 +732,8 @@ module De = struct
   let array de ctx =
     let* list = list de ctx in
     Ok (Array.of_list list)
+
+  let ignore_any ctx = deserialize_ignored_any ctx
 
   let d (type state) de ((((module D) as self), state) : state ctx) =
     let state = D.nest state in
