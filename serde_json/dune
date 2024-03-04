@@ -10,3 +10,11 @@
  (libraries serde_json serde qcheck spices)
  (preprocess
   (pps serde_derive)))
+
+(test
+ (package serde_json)
+ (name serde_json_rename_test)
+ (modules serde_json_rename_test)
+ (libraries serde_json serde qcheck spices)
+ (preprocess
+  (pps serde_derive)))

@@ -140,7 +140,9 @@ module Record_deserializer = struct
     let open Attributes in
     let loc = loc ~ctxt in
     let labels = List.rev labels in
-    let labels = List.map Attributes.of_field_attributes labels in
+    let labels =
+      List.map (Attributes.of_field_attributes type_attributes) labels
+    in
 
     (* NOTE(@leostera): Generate the final assembling of the record value
 
