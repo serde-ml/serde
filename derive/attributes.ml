@@ -17,7 +17,7 @@ type type_attributes = {
     | `kebab_case
     | `SCREAMING_KEBAB_CASE ]
     option;
-  error_on_unknown_fields : bool;
+  deny_unknown_fields : bool;
 }
 
 type variant_attributes = {
@@ -35,6 +35,45 @@ type field_attributes = {
     | `always
     | `never ];
 }
+
+(* deserialize_ignored_any *)
+let of_record_attributes attributes =
+  (* Field defaults *)
+  let deny_unknown_fields = ref false in
+  (* Retrieve fields *)
+  let serde_attr =
+    List.find_opt (fun attr -> attr.attr_name.txt = "serde") attributes
+  in
+  Option.iter
+    (fun attr ->
+      match attr.attr_payload with
+      | PStr
+          [
+            {
+              pstr_desc =
+                Pstr_eval ({ pexp_desc = Pexp_record (fields, _); _ }, _);
+              _;
+            };
+          ] ->
+          List.iter
+            (function
+              | { txt = Lident "deny_unknown_fields"; _ }, [%expr true] ->
+                  deny_unknown_fields := true
+              | { txt = Lident "deny_unknown_fields"; _ }, [%expr false] ->
+                  deny_unknown_fields := false
+              | { txt = Lident txt; _ }, _ ->
+                  failwith
+                    (Format.sprintf "[ppx_serde] Unknown attribute %S" txt)
+              | _ -> ())
+            fields
+      | _ -> ())
+    serde_attr;
+  {
+    rename = "";
+    mode = `normal;
+    rename_all = None;
+    deny_unknown_fields = !deny_unknown_fields;
+  }
 
 let of_field_attributes lbl =
   let open Ppxlib in

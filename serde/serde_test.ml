@@ -185,6 +185,10 @@ module Serde_bin = struct
 
     let deserialize_variant self _state visitor ~name:_ ~variants:_ =
       Visitor.visit_variant self visitor
+
+    (* TODO: Could probably test this but I don't think it's worth it? *)
+    let deserialize_ignored_any _ _ =
+      failwith "Should not be called in this test"
   end
 
   let to_string ser value =
