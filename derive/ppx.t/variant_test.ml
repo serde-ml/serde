@@ -5,7 +5,7 @@ type rank =
   | Commander of string * int32 * float
   | Lt of bool option
   | Ensign
-[@@deriving serialize, deserialize]
+[@@deriving serialize, deserialize] [@@serde {tag = "t"; content = "c"}]
 
 type ranks = Ranks of rank list [@@deriving serialize, deserialize]
 
