@@ -6,7 +6,7 @@ type type_attributes = {
     [ `tag of string
     | `tag_and_content of string * string
     | `untagged
-    | `normal ];
+    | `externally_tagged ];
   rename_all :
     [ `lowercase
     | `UPPERCASE
@@ -41,7 +41,7 @@ let of_record_attributes attributes =
   (* Field defaults *)
   let rename_all = ref None in
   let deny_unknown_fields = ref false in
-  let mode = ref `normal in
+  let mode = ref `externally_tagged in
   (* Retrieve fields *)
   let serde_attr =
     List.find_opt (fun attr -> attr.attr_name.txt = "serde") attributes
