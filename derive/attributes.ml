@@ -6,8 +6,7 @@ type type_attributes = {
     [ `externally_tagged
     | `internally_tagged of string
     | `adjacently_tagged of string * string
-    | `untagged
-     ];
+    | `untagged ];
   rename_all :
     [ `lowercase
     | `UPPERCASE

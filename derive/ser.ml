@@ -270,12 +270,19 @@ let gen_serialize_adjacently_tagged_variant_impl ~tag_field_name
 
   Ast.pexp_match ~loc [%expr t] cases
 
+let gen_serialize_internally_tagged_variant_impl ~tag_field_name:_ ~ctxt:_
+    _ptype_name _type_attributes _cstr_declarations =
+  failwith "not implemented"
+
 let gen_serialize_variant_impl ~ctxt ptype_name type_attributes
     cstr_declarations =
   match type_attributes.Attributes.mode with
   | `externally_tagged ->
       gen_serialize_externally_tagged_variant_impl ~ctxt ptype_name
         type_attributes cstr_declarations
+  | `internally_tagged tag_field_name ->
+      gen_serialize_internally_tagged_variant_impl ~tag_field_name ~ctxt
+        ptype_name type_attributes cstr_declarations
   | `adjacently_tagged (tag_field_name, content_field_name) ->
       gen_serialize_adjacently_tagged_variant_impl ~tag_field_name
         ~content_field_name ~ctxt ptype_name type_attributes cstr_declarations

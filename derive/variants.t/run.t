@@ -1,3 +1,5 @@
+$ externally tagged variant
+
   $ dune clean
   $ dune exec ./variant_externally_tagged_test.exe | jq .
   [
@@ -266,6 +268,8 @@
     let value = (Serde_json.of_string deserialize_ranks json1) |> Result.get_ok in
     let json2 = (Serde_json.to_string serialize_ranks value) |> Result.get_ok in
     Format.printf "[%s,%s]\n%!" json1 json2
+
+$ adjacently tagged variant
 
   $ dune exec ./variant_adjacently_tagged_test.exe | jq .
   [
@@ -677,3 +681,18 @@
     let value = (Serde_json.of_string deserialize_ranks json1) |> Result.get_ok in
     let json2 = (Serde_json.to_string serialize_ranks value) |> Result.get_ok in
     Format.printf "[%s,%s]\n%!" json1 json2
+
+
+$ internally tagged variant
+
+  $ dune exec ./variant_internally_tagged_test.exe | jq .
+  File "dune", line 16, characters 14-32:
+  16 |   (preprocess (pps serde_derive))
+                     ^^^^^^^^^^^^^^^^^^
+  Fatal error: exception Failure("not implemented")
+  $ dune describe pp ./variant_internally_tagged_test.ml
+  File "dune", line 16, characters 14-32:
+  16 |   (preprocess (pps serde_derive))
+                     ^^^^^^^^^^^^^^^^^^
+  Fatal error: exception Failure("not implemented")
+  [1]

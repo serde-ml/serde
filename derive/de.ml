@@ -703,8 +703,11 @@ let gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
 
     record ctx "" 2 (fun ctx ->
         let rec read_fields ctx = [%e read_fields_impl] in
-
         read_fields ctx)]
+
+let gen_deserialize_internally_tagged_variant_impl ~tag_field_name:_ ~ctxt:_
+    _ptype_name _type_attributes _cstr_declarations =
+  failwith "not implemented"
 
 let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
     cstr_declarations =
@@ -712,6 +715,9 @@ let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
   | `externally_tagged ->
       gen_deserialize_externally_tagged_variant_impl ~ctxt ptype_name
         type_attributes cstr_declarations
+  | `internally_tagged tag_field_name ->
+      gen_deserialize_internally_tagged_variant_impl ~tag_field_name ~ctxt
+        ptype_name type_attributes cstr_declarations
   | `adjacently_tagged (tag_field_name, content_field_name) ->
       gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
         ~content_field_name ~ctxt ptype_name type_attributes cstr_declarations
