@@ -711,7 +711,7 @@ let gen_deserialize_internally_tagged_variant_impl ~tag_field_name:_ ~ctxt:_
 
 let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
     cstr_declarations =
-  match type_attributes.Attributes.mode with
+  match type_attributes.Attributes.variant_tagging_mode with
   | `externally_tagged ->
       gen_deserialize_externally_tagged_variant_impl ~ctxt ptype_name
         type_attributes cstr_declarations

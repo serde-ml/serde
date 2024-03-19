@@ -2,7 +2,7 @@ open Ppxlib
 
 type type_attributes = {
   rename : string;
-  mode :
+  variant_tagging_mode :
     [ `externally_tagged
     | `internally_tagged of string
     | `adjacently_tagged of string * string
@@ -41,7 +41,7 @@ let of_record_attributes attributes =
   (* Field defaults *)
   let rename_all = ref None in
   let deny_unknown_fields = ref false in
-  let mode = ref `externally_tagged in
+  let variant_tagging_mode = ref `externally_tagged in
   (* Retrieve fields *)
   let serde_attr =
     List.find_opt (fun attr -> attr.attr_name.txt = "serde") attributes
@@ -62,21 +62,21 @@ let of_record_attributes attributes =
               | ( { txt = Lident "tag"; _ },
                   { pexp_desc = Pexp_constant (Pconst_string (s, _, _)); _ } )
                 ->
-                  mode := `internally_tagged s
+                  variant_tagging_mode := `internally_tagged s
               | ( { txt = Lident "content"; _ },
                   { pexp_desc = Pexp_constant (Pconst_string (s, _, _)); _ } )
                 ->
                   let new_mode =
-                    match !mode with
+                    match !variant_tagging_mode with
                     | `internally_tagged t -> `adjacently_tagged (t, s)
                     | _ ->
                         failwith
                           "[ppx_serde] You can only use the 'content' \
                            attribute after the 'tag' attribute."
                   in
-                  mode := new_mode
+                  variant_tagging_mode := new_mode
               | { txt = Lident "untagged"; _ }, [%expr true] ->
-                  mode := `untagged
+                  variant_tagging_mode := `untagged
               | { txt = Lident "deny_unknown_fields"; _ }, [%expr true] ->
                   deny_unknown_fields := true
               | { txt = Lident "deny_unknown_fields"; _ }, [%expr false] ->
@@ -112,7 +112,7 @@ let of_record_attributes attributes =
     serde_attr;
   {
     rename = "";
-    mode = !mode;
+    variant_tagging_mode = !variant_tagging_mode;
     rename_all = !rename_all;
     deny_unknown_fields = !deny_unknown_fields;
   }
