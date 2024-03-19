@@ -183,8 +183,8 @@ module Serde_bin = struct
         let* v = De.deserialize self de in
         Ok (Some v)
 
-    let deserialize_variant self _state visitor ~name:_ ~variants:_ =
-      Visitor.visit_variant self visitor
+    let deserialize_variant self _state de ~name:_ ~variants:_ =
+      De.deserialize self de
 
     (* TODO: Could probably test this but I don't think it's worth it? *)
     let deserialize_ignored_any _ _ =

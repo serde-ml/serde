@@ -254,17 +254,17 @@ module Deserializer = struct
     let* () = Parser.read_colon reader in
     De.deserialize_record self "" size (de ~size)
 
-  let deserialize_variant self { reader; _ } visitor ~name:_ ~variants:_ =
+  let deserialize_variant self { reader; _ } de ~name:_ ~variants:_ =
     Parser.skip_space reader;
     match Parser.peek reader with
     | Some '{' ->
         let* () = Parser.read_object_start reader in
         Parser.skip_space reader;
-        let* value = Visitor.visit_variant self visitor in
+        let* value = De.deserialize self de in
         Parser.skip_space reader;
         let* () = Parser.read_object_end reader in
         Ok value
-    | Some '"' -> Visitor.visit_variant self visitor
+    | Some '"' -> De.deserialize self de
     | _ -> assert false
 
   let deserialize_record self { reader; _ } ~name:_ ~size:_ fields =
