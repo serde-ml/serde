@@ -3,10 +3,11 @@ open Ppxlib
 type type_attributes = {
   rename : string;
   mode :
-    [ `tag of string
-    | `tag_and_content of string * string
+    [ `externally_tagged
+    | `internally_tagged of string
+    | `adjacently_tagged of string * string
     | `untagged
-    | `externally_tagged ];
+     ];
   rename_all :
     [ `lowercase
     | `UPPERCASE
@@ -62,13 +63,13 @@ let of_record_attributes attributes =
               | ( { txt = Lident "tag"; _ },
                   { pexp_desc = Pexp_constant (Pconst_string (s, _, _)); _ } )
                 ->
-                  mode := `tag s
+                  mode := `internally_tagged s
               | ( { txt = Lident "content"; _ },
                   { pexp_desc = Pexp_constant (Pconst_string (s, _, _)); _ } )
                 ->
                   let new_mode =
                     match !mode with
-                    | `tag t -> `tag_and_content (t, s)
+                    | `internally_tagged t -> `adjacently_tagged (t, s)
                     | _ ->
                         failwith
                           "[ppx_serde] You can only use the 'content' \

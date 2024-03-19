@@ -712,7 +712,7 @@ let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
   | `externally_tagged ->
       gen_deserialize_externally_tagged_variant_impl ~ctxt ptype_name
         type_attributes cstr_declarations
-  | `tag_and_content (tag_field_name, content_field_name) ->
+  | `adjacently_tagged (tag_field_name, content_field_name) ->
       gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
         ~content_field_name ~ctxt ptype_name type_attributes cstr_declarations
   | _ -> failwith "not implemented"
