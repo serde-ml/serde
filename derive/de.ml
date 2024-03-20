@@ -24,6 +24,8 @@ let deserializer_fn_name_for_longident name =
   in
   Longident.parse name
 
+let error_with_msg ~loc msg = [%expr Error (`Msg [%e Ast.estring ~loc msg])]
+
 let is_primitive = function
   | "bool" | "char" | "float" | "int" | "int32" | "int64" | "string" | "list"
   | "array" | "unit" | "option" ->
@@ -618,7 +620,7 @@ let gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
       (cases
       @ [
           Ast.case ~lhs:(Ast.ppat_any ~loc) ~guard:None
-            ~rhs:[%expr Error (`Msg "variant constructor not recognized")];
+            ~rhs:(error_with_msg ~loc "variant constructor not recognized");
         ])
   in
 
@@ -636,11 +638,9 @@ let gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
             match field_name with
             | Some `content -> [%e tag_dispatch]
             | Some `tag ->
-                Error
-                  (`Msg
-                    [%e
-                      Ast.estring ~loc
-                        ("duplicate field \"" ^ tag_field_name ^ "\"")])
+                [%e
+                  error_with_msg ~loc
+                    (Format.sprintf "duplicate field %S" tag_field_name)]
             | Some `invalid_tag ->
                 let* () = ignore_any ctx in
                 inner_read_fields ()
@@ -653,13 +653,10 @@ let gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
           in
           inner_read_fields ()
       | Some `content ->
-          Error
-            (`Msg
-              [%e
-                Ast.estring ~loc
-                  ("field \"" ^ tag_field_name
-                 ^ "\" must appear first, found \"" ^ content_field_name
-                 ^ "\" instead")])
+          [%e
+            error_with_msg ~loc
+              (Format.sprintf "field %S must appear first, found %S instead"
+                 tag_field_name content_field_name)]
           (* TODO(@sabine): Here, the Rust implementation deserializes
              the content field into an intermediate representation, then reads the tag field,
              and continues to deserialize the content field from the intermediate representation
@@ -671,9 +668,9 @@ let gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
           let* () = ignore_any ctx in
           read_fields ctx
       | None ->
-          Error
-            (`Msg
-              [%e Ast.estring ~loc ("missing field \"" ^ tag_field_name ^ "\"")])]
+          [%e
+            error_with_msg ~loc
+              (Format.sprintf "missing field %S" tag_field_name)]]
   in
 
   [%expr
