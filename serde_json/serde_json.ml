@@ -177,10 +177,11 @@ module Serializer = struct
     let* () = Fmt.end_object_value fmt in
     Fmt.end_object fmt
 
-  let serialize_record self (S { fmt; _ }) ~rec_type:_ ~size:_ values =
-    let* () = Fmt.begin_object fmt in
+  let serialize_record self (S s) ~rec_type:_ ~size:_ values =
+    let* () = Fmt.begin_object s.fmt in
+    s.kind <- First;
     let* () = Ser.serialize self values in
-    Fmt.end_object fmt
+    Fmt.end_object s.fmt
 
   let serialize_field self (S s) ~name values =
     let first = if s.kind = First then true else false in
@@ -225,6 +226,7 @@ module Deserializer = struct
 
   let deserialize_sequence self s ~size de =
     let* () = Parser.read_open_bracket s.reader in
+    s.kind <- First;
     let* v = De.deserialize self (de ~size) in
     let* () = Parser.read_close_bracket s.reader in
     Ok v
@@ -267,15 +269,16 @@ module Deserializer = struct
     | Some '"' -> De.deserialize self de
     | _ -> assert false
 
-  let deserialize_record self { reader; _ } ~name:_ ~size:_ fields =
-    Parser.skip_space reader;
-    match Parser.peek reader with
+  let deserialize_record self s ~name:_ ~size:_ fields =
+    Parser.skip_space s.reader;
+    match Parser.peek s.reader with
     | Some '{' ->
-        let* () = Parser.read_object_start reader in
-        Parser.skip_space reader;
+        let* () = Parser.read_object_start s.reader in
+        Parser.skip_space s.reader;
+        s.kind <- First;
         let* value = De.deserialize self fields in
-        Parser.skip_space reader;
-        let* () = Parser.read_object_end reader in
+        Parser.skip_space s.reader;
+        let* () = Parser.read_object_end s.reader in
         Ok value
     | Some c -> failwith (Format.sprintf "what: %c" c)
     | None -> failwith "unexpected eof"
