@@ -400,7 +400,6 @@ module rec De_base : sig
   type ('value, 'state, 'tag) visitor = {
     visit_int : 'state De_base.ctx -> int -> ('value, error) result;
     visit_string : 'state De_base.ctx -> string -> ('value, error) result;
-    visit_variant : 'state De_base.ctx -> ('value, error) result;
   }
 
   val deserializer :
@@ -424,7 +423,7 @@ module rec De_base : sig
     val deserialize_variant :
       state ctx ->
       state ->
-      ('value, state, 'tag) visitor ->
+      (state ctx -> ('value, error) result) ->
       name:string ->
       variants:string list ->
       ('value, error) result
@@ -498,7 +497,6 @@ end = struct
   type ('value, 'state, 'tag) visitor = {
     visit_int : 'state De_base.ctx -> int -> ('value, error) result;
     visit_string : 'state De_base.ctx -> string -> ('value, error) result;
-    visit_variant : 'state De_base.ctx -> ('value, error) result;
   }
 
   let deserializer fn = fn
@@ -521,7 +519,7 @@ end = struct
     val deserialize_variant :
       state ctx ->
       state ->
-      ('value, state, 'tag) visitor ->
+      (state ctx -> ('value, error) result) ->
       name:string ->
       variants:string list ->
       ('value, error) result
@@ -594,7 +592,6 @@ module Visitor = struct
   type ('value, 'state, 'tag) t = ('value, 'state, 'tag) De_base.visitor = {
     visit_int : 'state De_base.ctx -> int -> ('value, error) result;
     visit_string : 'state De_base.ctx -> string -> ('value, error) result;
-    visit_variant : 'state De_base.ctx -> ('value, error) result;
   }
 
   let default =
@@ -602,14 +599,12 @@ module Visitor = struct
       {
         visit_int = (fun _ctx _int -> Error `unimplemented);
         visit_string = (fun _ctx _str -> Error `unimplemented);
-        visit_variant = (fun _ctx -> Error `unimplemented);
       }
 
   let make ?(visit_int = default.visit_int)
       ?(visit_string = default.visit_string) () =
-    { default with visit_int; visit_string }
+    { visit_int; visit_string }
 
-  let visit_variant ctx t = t.visit_variant ctx
   let visit_string ctx t str = t.visit_string ctx str
   let visit_int ctx t str = t.visit_int ctx str
 end
@@ -657,8 +652,8 @@ module De = struct
     D.deserialize_element ctx state de
 
   let deserialize_variant (type state) (((module D), state) as ctx : state ctx)
-      ~visitor ~name ~variants =
-    D.deserialize_variant ctx state visitor ~name ~variants
+      ~de ~name ~variants =
+    D.deserialize_variant ctx state de ~name ~variants
 
   let deserialize_unit_variant (type state)
       (((module D), state) as ctx : state ctx) =
@@ -696,11 +691,7 @@ module De = struct
     D.deserialize_ignored_any ctx state
 
   let record ctx name size de = deserialize_record ctx name size de
-
-  let variant ctx name variants visit_variant =
-    let visitor = { Visitor.default with visit_variant } in
-    deserialize_variant ctx ~visitor ~name ~variants
-
+  let variant ctx name variants de = deserialize_variant ctx ~de ~name ~variants
   let sequence ctx de = deserialize_sequence ctx 0 de
   let bool ctx = deserialize_bool ctx
   let int ctx = deserialize_int31 ctx

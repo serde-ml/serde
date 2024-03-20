@@ -128,4 +128,4 @@ let () =
 
   test_ser_with_lowercase () |> Result.get_ok;
   test_ser_with_uppercase () |> Result.get_ok;
-  test_ser_with_camelcase () |> Result.get_ok;
+  test_ser_with_camelcase () |> Result.get_ok
