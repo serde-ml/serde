@@ -24,6 +24,8 @@ let deserializer_fn_name_for_longident name =
   in
   Longident.parse name
 
+let error_with_msg ~loc msg = [%expr Error (`Msg [%e Ast.estring ~loc msg])]
+
 let is_primitive = function
   | "bool" | "char" | "float" | "int" | "int32" | "int64" | "string" | "list"
   | "array" | "unit" | "option" ->
@@ -372,8 +374,8 @@ module Record_deserializer = struct
     @@ record_expr
 end
 
-let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
-    cstr_declarations =
+let gen_deserialize_externally_tagged_variant_impl ~ctxt ptype_name
+    type_attributes cstr_declarations =
   let loc = loc ~ctxt in
   let type_name = Ast.estring ~loc ptype_name.txt in
   let constructor_names =
@@ -484,7 +486,6 @@ let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
 
     Ast.pexp_match ~loc [%expr tag] cases
   in
-
   let field_visitor =
     let cases =
       List.mapi
@@ -513,6 +514,211 @@ let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
     variant ctx [%e type_name] [%e constructor_names] @@ fun ctx ->
     let* tag = identifier ctx field_visitor in
     [%e tag_dispatch]]
+
+let gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
+    ~content_field_name ~ctxt ptype_name type_attributes cstr_declarations =
+  let loc = loc ~ctxt in
+  let type_name = Ast.estring ~loc ptype_name.txt in
+
+  let deser_by_constructor _type_name idx cstr =
+    let _idx = Ast.eint ~loc idx in
+    let name = Longident.parse cstr.pcd_name.txt |> var ~ctxt in
+    match cstr.pcd_args with
+    (* NOTE(@leostera): deserialize a single unit variant *)
+    | Pcstr_tuple [] ->
+        let value = Ast.pexp_construct ~loc name None in
+        (* there's nothing to do here because the unit variant carries no values *)
+        [%expr Ok [%e value]]
+    (* NOTE(@leostera): deserialize a newtype variant *)
+    | Pcstr_tuple [ arg ] ->
+        let sym = gensym () ~ctxt in
+        let arg_pat = Ast.pvar ~loc sym.txt in
+        let arg_var = Ast.evar ~loc sym.txt in
+
+        let value =
+          let cstr = Ast.pexp_construct ~loc name (Some arg_var) in
+          [%expr Ok [%e cstr]]
+        in
+
+        let ser_fn = deserializer_for_type ~ctxt arg in
+        let body =
+          [%expr
+            let* [%p arg_pat] = [%e ser_fn] ctx in
+            [%e value]]
+        in
+
+        [%expr deserialize ctx @@ fun ctx -> [%e body]]
+    (* NOTE(@leostera): deserialize a tuple variant *)
+    | Pcstr_tuple args ->
+        let gensym = gensym () in
+        let calls =
+          List.mapi
+            (fun _idx arg ->
+              let ser_fn = deserializer_for_type ~ctxt arg in
+              let arg_var = (gensym ~ctxt).txt in
+              let deser =
+                [%expr
+                  match element ctx [%e ser_fn] with
+                  | Ok (Some v) -> Ok v
+                  | Ok None -> Error `no_more_data
+                  | Error reason -> Error reason]
+              in
+
+              (arg_var, deser))
+            args
+        in
+
+        let calls =
+          let args =
+            Ast.pexp_tuple ~loc
+              (List.map (fun (field, _) -> Ast.evar ~loc field) calls)
+          in
+          let cstr = Ast.pexp_construct ~loc name (Some args) in
+
+          List.fold_left
+            (fun last (field, expr) ->
+              let field = Ast.pvar ~loc field in
+              [%expr
+                let* [%p field] = [%e expr] in
+                [%e last]])
+            [%expr Ok [%e cstr]]
+            (List.rev calls)
+        in
+        [%expr
+          sequence ctx (fun ~size ctx ->
+              ignore size;
+              [%e calls])]
+    (* NOTE(@leostera): deserialize a record_variant *)
+    | Pcstr_record labels ->
+        let field_count = Ast.eint ~loc (List.length labels) in
+        let body =
+          Record_deserializer.deserialize_with_unordered_fields ~ctxt
+            type_attributes labels
+          @@ fun record ->
+          let cstr = Ast.pexp_construct ~loc name (Some record) in
+          [%expr Ok [%e cstr]]
+        in
+
+        [%expr record ctx "" [%e field_count] (fun ctx -> [%e body])]
+  in
+
+  let tag_dispatch =
+    let cases =
+      List.mapi
+        (fun idx (cstr : Parsetree.constructor_declaration) ->
+          let lhs =
+            Ast.ppat_constant ~loc
+              (Ast_helper.Const.string ~loc cstr.pcd_name.txt)
+          in
+          let rhs = deser_by_constructor type_name idx cstr in
+          Ast.case ~lhs ~guard:None ~rhs)
+        cstr_declarations
+    in
+
+    Ast.pexp_match ~loc
+      Ast.(evar ~loc "variant")
+      (cases
+      @ [
+          Ast.case ~lhs:(Ast.ppat_any ~loc) ~guard:None
+            ~rhs:(error_with_msg ~loc "variant constructor not recognized");
+        ])
+  in
+
+  let read_fields_impl =
+    [%expr
+      let* field_name = next_field ctx tag_content_field_visitor in
+      match field_name with
+      | Some `tag ->
+          let rec inner_read_fields () =
+            let* variant =
+              field ctx [%e Ast.estring ~loc tag_field_name] string
+            in
+            let* field_name = next_field ctx tag_content_field_visitor in
+
+            match field_name with
+            | Some `content -> [%e tag_dispatch]
+            | Some `tag ->
+                [%e
+                  error_with_msg ~loc
+                    (Format.sprintf "duplicate field %S" tag_field_name)]
+            | Some `invalid_tag ->
+                let* () = ignore_any ctx in
+                inner_read_fields ()
+            | None ->
+                (* NOTE(@sabine): we need to dispatch here because
+                   it could be a unit variant - in this case, there's no content field.
+                   However, in case of a missing content field on a non-unit variant constructor,
+                   we don't get a nice error message. This could be improved. *)
+                [%e tag_dispatch]
+          in
+          inner_read_fields ()
+      | Some `content ->
+          [%e
+            error_with_msg ~loc
+              (Format.sprintf "field %S must appear first, found %S instead"
+                 tag_field_name content_field_name)]
+          (* TODO(@sabine): Here, the Rust implementation deserializes
+             the content field into an intermediate representation, then reads the tag field,
+             and continues to deserialize the content field from the intermediate representation
+
+             see https://github.com/serde-rs/serde/blob/9f8c579bf5f7478f91108c1186cd0d3f85aff29d/serde_derive/src/de.rs#L1641-L1647
+             and https://github.com/serde-rs/serde/blob/master/serde/src/private/de.rs#L198-L207
+          *)
+      | Some `invalid_tag ->
+          let* () = ignore_any ctx in
+          read_fields ctx
+      | None ->
+          [%e
+            error_with_msg ~loc
+              (Format.sprintf "missing field %S" tag_field_name)]]
+  in
+
+  [%expr
+    let tag_content_field_visitor =
+      Visitor.make
+        ~visit_string:(fun _ctx str ->
+          [%e
+            Ast.pexp_match ~loc [%expr str]
+              [
+                Ast.case
+                  ~lhs:
+                    (Ast.ppat_constant ~loc
+                       (Ast_helper.Const.string tag_field_name))
+                  ~guard:None
+                  ~rhs:[%expr Ok [%e Ast.pexp_variant ~loc "tag" None]];
+                Ast.case
+                  ~lhs:
+                    (Ast.ppat_constant ~loc
+                       (Ast_helper.Const.string content_field_name))
+                  ~guard:None
+                  ~rhs:[%expr Ok [%e Ast.pexp_variant ~loc "content" None]];
+                Ast.case ~lhs:(Ast.ppat_any ~loc) ~guard:None
+                  ~rhs:[%expr Error `invalid_tag];
+              ]])
+        ()
+    in
+
+    record ctx "" 2 (fun ctx ->
+        let rec read_fields ctx = [%e read_fields_impl] in
+        read_fields ctx)]
+
+let gen_deserialize_internally_tagged_variant_impl ~tag_field_name:_ ~ctxt:_
+    _ptype_name _type_attributes _cstr_declarations =
+  failwith "not implemented"
+
+let gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
+    cstr_declarations =
+  match type_attributes.Attributes.variant_tagging_mode with
+  | `externally_tagged ->
+      gen_deserialize_externally_tagged_variant_impl ~ctxt ptype_name
+        type_attributes cstr_declarations
+  | `internally_tagged tag_field_name ->
+      gen_deserialize_internally_tagged_variant_impl ~tag_field_name ~ctxt
+        ptype_name type_attributes cstr_declarations
+  | `adjacently_tagged (tag_field_name, content_field_name) ->
+      gen_deserialize_adjacently_tagged_variant_impl ~tag_field_name
+        ~content_field_name ~ctxt ptype_name type_attributes cstr_declarations
+  | _ -> failwith "not implemented"
 
 (** Generate the deserializer function for a record type. 
 

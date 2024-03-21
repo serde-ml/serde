@@ -1,0 +1,5 @@
+(executable
+  (name record_test)
+  (modules record_test)
+  (preprocess (pps serde_derive))
+  (libraries serde serde_json))

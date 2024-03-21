@@ -1,0 +1,17 @@
+(executable
+  (name variant_adjacently_tagged_test)
+  (modules variant_adjacently_tagged_test)
+  (preprocess (pps serde_derive))
+  (libraries serde serde_json))
+
+(executable
+  (name variant_externally_tagged_test)
+  (modules variant_externally_tagged_test)
+  (preprocess (pps serde_derive))
+  (libraries serde serde_json))
+
+(executable
+  (name variant_internally_tagged_test)
+  (modules variant_internally_tagged_test)
+  (preprocess (pps serde_derive))
+  (libraries serde serde_json))
