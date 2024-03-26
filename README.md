@@ -55,7 +55,7 @@ To derive deserialize/serialize functions for your data types, make sure to
 * include `(preprocess (pps serde_derive))` in your library config
 * include any of the formats you want to use (like `serde_json`)
 
-Now you can add `@@deriving` annotatinos to your types:
+Now you can add `@@deriving` annotations to your types:
 
 ```ocaml
 type rank = Captain | Chief_petty_officer [@@deriving serialize, deserialize]
