@@ -1,2 +1,7 @@
 _build
 _opam
+
+# nix ignores
+.direnv
+result
+.envrc
