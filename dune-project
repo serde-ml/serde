@@ -1,4 +1,4 @@
-(lang dune 3.13)
+(lang dune 3.12)
 (cram enable)
 
 (name serde)
