@@ -24,7 +24,6 @@
    (rio (>= "0.0.8"))
    (spices :with-test)
    dune))
-   
 
 (package
  (name serde_derive)
@@ -35,8 +34,8 @@
    (ppx_deriving (>= "5.2.1"))
    (ppxlib (>= "0.28.0"))
    (serde (= :version))
+   (serde_json (and :with-test (= :version)))
    dune))
-   
 
 (package
  (name serde_json)
@@ -47,7 +46,7 @@
    (qcheck :with-test)
    (rio (>= "0.0.8"))
    (serde (= :version))
-   (serde_derive (= :version))
+   (serde_derive (and :with-test (= :version)))
    (spices :with-test)
    (yojson (>= "2.1.0"))
    dune))

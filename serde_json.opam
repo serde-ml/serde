@@ -12,7 +12,7 @@ depends: [
   "qcheck" {with-test}
   "rio" {>= "0.0.8"}
   "serde" {= version}
-  "serde_derive" {= version}
+  "serde_derive" {with-test & = version}
   "spices" {with-test}
   "yojson" {>= "2.1.0"}
   "dune" {>= "3.12"}

@@ -12,8 +12,8 @@ The main goals for `serde.ml` are:
   structures of the user's choice with maximum efficiency.
 
 ```ocaml
-type rank = Captain | Chief_petty_officer [@@deriving serializer, deserializer]
-type t = { name : string; rank : rank } [@@deriving serializer, deserializer]
+type rank = Captain | Chief_petty_officer [@@deriving serialize, deserialize]
+type t = { name : string; rank : rank } [@@deriving serialize, deserialize]
 
 let obrien = { name = "Miles O'Brien"; rank = Chief_petty_officer }
 let sisko = { name = "Benjamin Sisko"; rank = Captain }

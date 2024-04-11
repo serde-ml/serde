@@ -6,6 +6,7 @@
   (pps ppxlib.metaquot)))
 
 (cram
+ (package serde_derive)
  (deps
   (package serde)
   (package serde_derive)
