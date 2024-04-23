@@ -117,6 +117,7 @@
       let _ = ( let* )
       let deserialize_rank =
         let ( let* ) = Result.bind in
+        let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
             record ctx "rank" 2
@@ -208,6 +209,7 @@
       let _ = ( let* )
       let deserialize_t =
         let ( let* ) = Result.bind in
+        let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
             record ctx "t" 8
@@ -352,6 +354,7 @@
       let _ = ( let* )
       let deserialize_t_list =
         let ( let* ) = Result.bind in
+        let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
             record ctx "t_list" 1

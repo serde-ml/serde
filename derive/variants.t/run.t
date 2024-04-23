@@ -117,6 +117,7 @@ $ externally tagged variant
       let _ = ( let* )
       let deserialize_rank =
         let ( let* ) = Result.bind in
+        let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
             let field_visitor =
@@ -234,6 +235,7 @@ $ externally tagged variant
       let _ = ( let* )
       let deserialize_ranks =
         let ( let* ) = Result.bind in
+        let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
             let field_visitor =
@@ -420,6 +422,7 @@ $ adjacently tagged variant
       let _ = ( let* )
       let deserialize_rank =
         let ( let* ) = Result.bind in
+        let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
             let tag_content_field_visitor =
@@ -647,6 +650,7 @@ $ adjacently tagged variant
       let _ = ( let* )
       let deserialize_ranks =
         let ( let* ) = Result.bind in
+        let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
             let field_visitor =

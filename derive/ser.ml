@@ -322,6 +322,11 @@ let gen_serialize_record_impl ~ctxt ptype_name type_attributes
 
   [%expr record ctx [%e type_name] [%e field_count] (fun ctx -> [%e fields])]
 
+let gen_serialize_abstract_impl ~ctxt _type_name core_type =
+  let loc = loc ~ctxt in
+  let ser = serializer_for_type ~ctxt core_type in
+  [%expr [%e ser] t ctx]
+
 let gen_serialize_impl ~ctxt type_decl =
   let loc = loc ~ctxt in
 
@@ -338,6 +343,13 @@ let gen_serialize_impl ~ctxt type_decl =
     | { ptype_kind = Ptype_variant cstrs_declaration; ptype_name; _ } ->
         gen_serialize_variant_impl ~ctxt ptype_name type_attributes
           cstrs_declaration
+    | {
+     ptype_kind = Ptype_abstract;
+     ptype_name;
+     ptype_manifest = Some core_type;
+     _;
+    } ->
+        gen_serialize_abstract_impl ~ctxt ptype_name core_type
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with
