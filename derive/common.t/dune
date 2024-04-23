@@ -1,0 +1,5 @@
+(executable
+  (name common_test)
+  (modules common_test)
+  (preprocess (pps serde_derive))
+  (libraries serde serde_json))

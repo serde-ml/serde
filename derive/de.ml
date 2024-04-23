@@ -8,6 +8,11 @@ let var ~ctxt name =
   let loc = loc ~ctxt in
   Loc.make ~loc name
 
+(* [gensym ()] creates a new symbol generator that always starts at 0. It is convenient
+   for when you need to iterate and name variables several times.
+
+   If you need a global counter that won't restart, you can rebind `gensym` to `gensym ()`
+*)
 let gensym () =
   let counter = ref 0 in
   fun ~ctxt ->
@@ -738,6 +743,11 @@ let gen_deserialize_record_impl ~ctxt ptype_name type_attributes
 
   [%expr record ctx [%e type_name] [%e field_count] (fun ctx -> [%e body])]
 
+let gen_deserialize_abstract_impl ~ctxt _type_name core_type =
+  let loc = loc ~ctxt in
+  let de = deserializer_for_type ~ctxt core_type in
+  [%expr [%e de] ctx]
+
 (** Generates a deserializer implementation dispatching based on the kind of
   type that the [@@deriving] attribute was set on.
 *)
@@ -758,6 +768,13 @@ let gen_deserialize_impl ~ctxt type_decl =
     | { ptype_kind = Ptype_variant cstrs_declaration; ptype_name; _ } ->
         gen_deserialize_variant_impl ~ctxt ptype_name type_attributes
           cstrs_declaration
+    | {
+     ptype_kind = Ptype_abstract;
+     ptype_name;
+     ptype_manifest = Some core_type;
+     _;
+    } ->
+        gen_deserialize_abstract_impl ~ctxt ptype_name core_type
     | { ptype_kind; ptype_name; _ } ->
         let err =
           match ptype_kind with
@@ -775,6 +792,7 @@ let gen_deserialize_impl ~ctxt type_decl =
   [%stri
     let [%p deserializer_name] =
       let ( let* ) = Result.bind in
+      let _ = ( let* ) in
       Serde.De.(fun ctx -> [%e body])]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
