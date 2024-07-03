@@ -394,16 +394,15 @@ module Ser = struct
 end
 
 module rec De_base : sig
-  type ('value, 'state) t = 'state De_base.ctx -> ('value, error) result
-  and 'state ctx = 'state De_base.deserializer * 'state
+  type 'value t = De_base.ctx -> ('value, error) result
+  and ctx = Ctx : 'state De_base.deserializer * 'state -> ctx
 
-  type ('value, 'state, 'tag) visitor = {
-    visit_int : 'state De_base.ctx -> int -> ('value, error) result;
-    visit_string : 'state De_base.ctx -> string -> ('value, error) result;
+  type ('value, 'tag) visitor = {
+    visit_int : De_base.ctx -> int -> ('value, error) result;
+    visit_string : De_base.ctx -> string -> ('value, error) result;
   }
 
-  val deserializer :
-    ('state De_base.ctx -> ('value, error) result) -> ('value, 'state) t
+  val deserializer : 'value t -> 'value t
 
   module type Deserializer = sig
     type state
@@ -411,92 +410,82 @@ module rec De_base : sig
     val nest : state -> state
 
     val deserialize_sequence :
-      state ctx ->
+      ctx ->
       state ->
       size:int ->
-      (size:int -> ('value, state) t) ->
+      (size:int -> 'value t) ->
       ('value, error) result
 
     val deserialize_element :
-      state ctx -> state -> ('value, state) t -> ('value option, error) result
+      ctx -> state -> 'value t -> ('value option, error) result
 
     val deserialize_variant :
-      state ctx ->
+      ctx ->
       state ->
-      (state ctx -> ('value, error) result) ->
+      (ctx -> ('value, error) result) ->
       name:string ->
       variants:string list ->
       ('value, error) result
 
-    val deserialize_unit_variant : state ctx -> state -> (unit, error) result
+    val deserialize_unit_variant : ctx -> state -> (unit, error) result
 
     val deserialize_newtype_variant :
-      state ctx -> state -> ('value, state) t -> ('value, error) result
+      ctx -> state -> 'value t -> ('value, error) result
 
     val deserialize_tuple_variant :
-      state ctx ->
+      ctx ->
       state ->
       size:int ->
-      (size:int -> ('value, state) t) ->
+      (size:int -> 'value t) ->
       ('value, error) result
 
     val deserialize_record_variant :
-      state ctx ->
+      ctx ->
       state ->
       size:int ->
-      (size:int -> ('value, state) t) ->
+      (size:int -> 'value t) ->
       ('value, error) result
 
     val deserialize_record :
-      state ctx ->
+      ctx ->
       state ->
       name:string ->
       size:int ->
-      ('value, state) t ->
+      'value t ->
       ('value, error) result
 
     val deserialize_field :
-      state ctx ->
-      state ->
-      name:string ->
-      ('value, state) t ->
-      ('value, error) result
+      ctx -> state -> name:string -> 'value t -> ('value, error) result
 
     val deserialize_key :
-      state ctx ->
-      state ->
-      ('value, state, 'tag) visitor ->
-      ('value option, error) result
+      ctx -> state -> ('value, 'tag) visitor -> ('value option, error) result
 
     val deserialize_identifier :
-      state ctx ->
-      state ->
-      ('value, state, 'tag) visitor ->
-      ('value, error) result
+      ctx -> state -> ('value, 'tag) visitor -> ('value, error) result
 
-    val deserialize_string : state ctx -> state -> (string, error) result
-    val deserialize_int8 : state ctx -> state -> (char, error) result
-    val deserialize_int16 : state ctx -> state -> (int, error) result
-    val deserialize_int31 : state ctx -> state -> (int, error) result
-    val deserialize_int32 : state ctx -> state -> (int32, error) result
-    val deserialize_int64 : state ctx -> state -> (int64, error) result
-    val deserialize_bool : state ctx -> state -> (bool, error) result
-    val deserialize_float : state ctx -> state -> (float, error) result
+    val deserialize_string : ctx -> state -> (string, error) result
+    val deserialize_int8 : ctx -> state -> (char, error) result
+    val deserialize_int16 : ctx -> state -> (int, error) result
+    val deserialize_int31 : ctx -> state -> (int, error) result
+    val deserialize_int32 : ctx -> state -> (int32, error) result
+    val deserialize_int64 : ctx -> state -> (int64, error) result
+    val deserialize_bool : ctx -> state -> (bool, error) result
+    val deserialize_float : ctx -> state -> (float, error) result
 
     val deserialize_option :
-      state ctx -> state -> ('value, state) t -> ('value option, error) result
+      ctx -> state -> 'value t -> ('value option, error) result
 
-    val deserialize_ignored_any : state ctx -> state -> (unit, error) result
+    val deserialize_ignored_any : ctx -> state -> (unit, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
 end = struct
-  type ('value, 'state) t = 'state De_base.ctx -> ('value, error) result
-  and 'state ctx = 'state De_base.deserializer * 'state
+  type 'value t = ctx -> ('value, error) result
+  and ctx = Ctx : 'state De_base.deserializer * 'state -> ctx
 
-  type ('value, 'state, 'tag) visitor = {
-    visit_int : 'state De_base.ctx -> int -> ('value, error) result;
-    visit_string : 'state De_base.ctx -> string -> ('value, error) result;
+  type ('value, 'tag) visitor = {
+    visit_int : ctx -> int -> ('value, error) result;
+    visit_string : ctx -> string -> ('value, error) result;
   }
 
   let deserializer fn = fn
@@ -507,91 +496,81 @@ end = struct
     val nest : state -> state
 
     val deserialize_sequence :
-      state ctx ->
+      ctx ->
       state ->
       size:int ->
-      (size:int -> ('value, state) t) ->
+      (size:int -> 'value t) ->
       ('value, error) result
 
     val deserialize_element :
-      state ctx -> state -> ('value, state) t -> ('value option, error) result
+      ctx -> state -> 'value t -> ('value option, error) result
 
     val deserialize_variant :
-      state ctx ->
+      ctx ->
       state ->
-      (state ctx -> ('value, error) result) ->
+      (ctx -> ('value, error) result) ->
       name:string ->
       variants:string list ->
       ('value, error) result
 
-    val deserialize_unit_variant : state ctx -> state -> (unit, error) result
+    val deserialize_unit_variant : ctx -> state -> (unit, error) result
 
     val deserialize_newtype_variant :
-      state ctx -> state -> ('value, state) t -> ('value, error) result
+      ctx -> state -> 'value t -> ('value, error) result
 
     val deserialize_tuple_variant :
-      state ctx ->
+      ctx ->
       state ->
       size:int ->
-      (size:int -> ('value, state) t) ->
+      (size:int -> 'value t) ->
       ('value, error) result
 
     val deserialize_record_variant :
-      state ctx ->
+      ctx ->
       state ->
       size:int ->
-      (size:int -> ('value, state) t) ->
+      (size:int -> 'value t) ->
       ('value, error) result
 
     val deserialize_record :
-      state ctx ->
+      ctx ->
       state ->
       name:string ->
       size:int ->
-      ('value, state) t ->
+      'value t ->
       ('value, error) result
 
     val deserialize_field :
-      state ctx ->
-      state ->
-      name:string ->
-      ('value, state) t ->
-      ('value, error) result
+      ctx -> state -> name:string -> 'value t -> ('value, error) result
 
     val deserialize_key :
-      state ctx ->
-      state ->
-      ('value, state, 'tag) visitor ->
-      ('value option, error) result
+      ctx -> state -> ('value, 'tag) visitor -> ('value option, error) result
 
     val deserialize_identifier :
-      state ctx ->
-      state ->
-      ('value, state, 'tag) visitor ->
-      ('value, error) result
+      ctx -> state -> ('value, 'tag) visitor -> ('value, error) result
 
-    val deserialize_string : state ctx -> state -> (string, error) result
-    val deserialize_int8 : state ctx -> state -> (char, error) result
-    val deserialize_int16 : state ctx -> state -> (int, error) result
-    val deserialize_int31 : state ctx -> state -> (int, error) result
-    val deserialize_int32 : state ctx -> state -> (int32, error) result
-    val deserialize_int64 : state ctx -> state -> (int64, error) result
-    val deserialize_bool : state ctx -> state -> (bool, error) result
-    val deserialize_float : state ctx -> state -> (float, error) result
+    val deserialize_string : ctx -> state -> (string, error) result
+    val deserialize_int8 : ctx -> state -> (char, error) result
+    val deserialize_int16 : ctx -> state -> (int, error) result
+    val deserialize_int31 : ctx -> state -> (int, error) result
+    val deserialize_int32 : ctx -> state -> (int32, error) result
+    val deserialize_int64 : ctx -> state -> (int64, error) result
+    val deserialize_bool : ctx -> state -> (bool, error) result
+    val deserialize_float : ctx -> state -> (float, error) result
 
     val deserialize_option :
-      state ctx -> state -> ('value, state) t -> ('value option, error) result
+      ctx -> state -> 'value t -> ('value option, error) result
 
-    val deserialize_ignored_any : state ctx -> state -> (unit, error) result
+    val deserialize_ignored_any : ctx -> state -> (unit, error) result
   end
 
   type 'state deserializer = (module Deserializer with type state = 'state)
 end
 
 module Visitor = struct
-  type ('value, 'state, 'tag) t = ('value, 'state, 'tag) De_base.visitor = {
-    visit_int : 'state De_base.ctx -> int -> ('value, error) result;
-    visit_string : 'state De_base.ctx -> string -> ('value, error) result;
+  type ('value, 'tag) t = ('value, 'tag) De_base.visitor = {
+    visit_int : De_base.ctx -> int -> ('value, error) result;
+    visit_string : De_base.ctx -> string -> ('value, error) result;
   }
 
   let default =
@@ -614,80 +593,69 @@ module De = struct
 
   let deserialize ctx de = de ctx
 
-  let deserialize_int8 (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_int8 (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_int8 ctx state
 
-  let deserialize_int16 (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_int16 (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_int16 ctx state
 
-  let deserialize_int31 (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_int31 (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_int31 ctx state
 
-  let deserialize_int32 (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_int32 (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_int32 ctx state
 
-  let deserialize_int64 (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_int64 (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_int64 ctx state
 
-  let deserialize_bool (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_bool (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_bool ctx state
 
-  let deserialize_float (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_float (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_float ctx state
 
-  let deserialize_record (type state) (((module D), state) as ctx : state ctx)
-      name size de =
+  let deserialize_record (Ctx ((module D), state) as ctx : ctx) name size de =
     D.deserialize_record ctx state ~name ~size de
 
-  let deserialize_field (type state) (((module D), state) as ctx : state ctx)
-      name de =
+  let deserialize_field (Ctx ((module D), state) as ctx : ctx) name de =
     D.deserialize_field ctx state ~name de
 
-  let deserialize_sequence (type state) (((module D), state) as ctx : state ctx)
-      size de =
+  let deserialize_sequence (Ctx ((module D), state) as ctx : ctx) size de =
     D.deserialize_sequence ctx state ~size de
 
-  let deserialize_element (type state) (((module D), state) as ctx : state ctx)
-      de =
+  let deserialize_element (Ctx ((module D), state) as ctx : ctx) de =
     D.deserialize_element ctx state de
 
-  let deserialize_variant (type state) (((module D), state) as ctx : state ctx)
-      ~de ~name ~variants =
+  let deserialize_variant (Ctx ((module D), state) as ctx : ctx) ~de ~name
+      ~variants =
     D.deserialize_variant ctx state de ~name ~variants
 
-  let deserialize_unit_variant (type state)
-      (((module D), state) as ctx : state ctx) =
+  let deserialize_unit_variant (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_unit_variant ctx state
 
-  let deserialize_newtype_variant (type state)
-      (((module D), state) as ctx : state ctx) de =
+  let deserialize_newtype_variant (Ctx ((module D), state) as ctx : ctx) de =
     D.deserialize_newtype_variant ctx state de
 
-  let deserialize_tuple_variant (type state)
-      (((module D), state) as ctx : state ctx) size de =
+  let deserialize_tuple_variant (Ctx ((module D), state) as ctx : ctx) size de =
     D.deserialize_tuple_variant ctx state ~size de
 
-  let deserialize_record_variant (type state)
-      (((module D), state) as ctx : state ctx) size de =
+  let deserialize_record_variant (Ctx ((module D), state) as ctx : ctx) size de
+      =
     D.deserialize_record_variant ctx state ~size de
 
-  let deserialize_key (type state) (((module D), state) as ctx : state ctx)
-      visitor =
+  let deserialize_key (Ctx ((module D), state) as ctx : ctx) visitor =
     D.deserialize_key ctx state visitor
 
-  let deserialize_identifier (type state)
-      (((module D), state) as ctx : state ctx) visitor =
+  let deserialize_identifier (Ctx ((module D), state) as ctx : ctx) visitor =
     D.deserialize_identifier ctx state visitor
 
-  let deserialize_string (type state) (((module D), state) as ctx : state ctx) =
+  let deserialize_string (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_string ctx state
 
-  let deserialize_option (type state) (((module D), state) as ctx : state ctx)
-      de =
+  let deserialize_option (Ctx ((module D), state) as ctx : ctx) de =
     D.deserialize_option ctx state de
 
-  let deserialize_ignored_any (type state)
-      (((module D), state) as ctx : state ctx) =
+  let deserialize_ignored_any (Ctx ((module D), state) as ctx : ctx) =
     D.deserialize_ignored_any ctx state
 
   let record ctx name size de = deserialize_record ctx name size de
@@ -726,9 +694,9 @@ module De = struct
 
   let ignore_any ctx = deserialize_ignored_any ctx
 
-  let d (type state) de ((((module D) as self), state) : state ctx) =
+  let d de (Ctx (((module D) as self), state) : ctx) =
     let state = D.nest state in
-    de (self, state)
+    de (Ctx (self, state))
 end
 
 module Serializer = struct
@@ -758,8 +726,5 @@ let serialize :
 
 let deserialize :
     type value state output.
-    state Deserializer.t ->
-    state ->
-    (value, state) De.t ->
-    (value, error) result =
- fun fmt ctx de -> de (fmt, ctx)
+    state Deserializer.t -> state -> value De.t -> (value, error) result =
+ fun fmt ctx de -> de (Ctx (fmt, ctx))
