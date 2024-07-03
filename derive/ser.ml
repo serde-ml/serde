@@ -364,12 +364,15 @@ let gen_serialize_impl ~ctxt type_decl =
   let serializer_name =
     "serialize_" ^ typename |> var ~ctxt |> Ast.ppat_var ~loc
   in
-  [%stri let [%p serializer_name] = Serde.Ser.(fun t ctx -> [%e body])]
+  [%stri
+    let [%p serializer_name] =
+      let ( let* ) = Stdlib.Result.bind in
+      let _ = ( let* ) in
+      Serde.Ser.(fun t ctx -> [%e body])]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
   let loc = loc ~ctxt in
-  [ [%stri let ( let* ) = Result.bind] ]
-  @ List.map (gen_serialize_impl ~ctxt) type_declarations
+  List.map (gen_serialize_impl ~ctxt) type_declarations
 
 let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
 

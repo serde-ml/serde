@@ -212,7 +212,9 @@ module Record_deserializer = struct
           | `required ->
               [%expr
                 let* [%p field_pat] =
-                  Option.to_result ~none:(`Msg [%e missing_msg]) ![%e field_var]
+                  Stdlib.Option.to_result
+                    ~none:(`Msg [%e missing_msg])
+                    ![%e field_var]
                 in
                 [%e last]]
           | `optional ->
@@ -791,13 +793,13 @@ let gen_deserialize_impl ~ctxt type_decl =
   in
   [%stri
     let [%p deserializer_name] =
-      let ( let* ) = Result.bind in
+      let ( let* ) = Stdlib.Result.bind in
       let _ = ( let* ) in
       Serde.De.(fun ctx -> [%e body])]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
   let loc = loc ~ctxt in
-  [ [%stri open! Serde]; [%stri let ( let* ) = Result.bind] ]
+  [ [%stri open! Serde] ]
   @ List.map (gen_deserialize_impl ~ctxt) type_declarations
 
 let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
