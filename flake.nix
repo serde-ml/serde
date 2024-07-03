@@ -1,5 +1,5 @@
 {
-  description = "A little TUI framework for OCaml";
+  description = "Serialization framework for OCaml";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
