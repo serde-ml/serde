@@ -79,7 +79,8 @@
     {
       tool_name = "ppx_driver";
       include_dirs = [];
-      load_path = [];
+      hidden_include_dirs = [];
+      load_path = ([], []);
       open_modules = [];
       for_package = None;
       debug = false;
@@ -98,25 +99,22 @@
   include
     struct
       let _ = fun (_ : rank) -> ()
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let serialize_rank =
+        let ( let* ) = Stdlib.Result.bind in
+        let _ = ( let* ) in
         let open Serde.Ser in
-          fun t ->
-            fun ctx ->
-              record ctx "rank" 2
-                (fun ctx ->
-                   let* () =
-                     field ctx "rank_scores" ((s (list string)) t.rank_scores)
-                    in
-                   let* () = field ctx "rank_name" (string t.rank_name)
-                    in Ok ())
+          fun t ctx ->
+            record ctx "rank" 2
+              (fun ctx ->
+                 let* () =
+                   field ctx "rank_scores" ((s (list string)) t.rank_scores)
+                  in
+                 let* () = field ctx "rank_name" (string t.rank_name)
+                  in Ok ())
       let _ = serialize_rank
       open! Serde
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let deserialize_rank =
-        let ( let* ) = Result.bind in
+        let ( let* ) = Stdlib.Result.bind in
         let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
@@ -153,13 +151,13 @@
                  let* () = read_fields ()
                   in
                  let* rank_scores =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg
                               "missing field \"rank_scores\" (\"rank_scores\")")
                      (!rank_scores)
                   in
                  let* rank_name =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg "missing field \"rank_name\" (\"rank_name\")")
                      (!rank_name)
                   in Ok { rank_name; rank_scores })
@@ -179,36 +177,32 @@
   include
     struct
       let _ = fun (_ : t) -> ()
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let serialize_t =
+        let ( let* ) = Stdlib.Result.bind in
+        let _ = ( let* ) in
         let open Serde.Ser in
-          fun t ->
-            fun ctx ->
-              record ctx "t" 8
-                (fun ctx ->
-                   let* () = field ctx "name" (string t.name)
-                    in
-                   let* () = field ctx "commisioned" (bool t.commisioned)
-                    in
-                   let* () = field ctx "updated_at" (int64 t.updated_at)
-                    in
-                   let* () = field ctx "credits" ((s (option int32)) t.credits)
-                    in
-                   let* () =
-                     field ctx "keywords" ((s (array string)) t.keywords)
-                    in
-                   let* () = field ctx "rank" ((s serialize_rank) t.rank)
-                    in
-                   let* () = field ctx "value" (float t.value)
-                    in let* () = field ctx "type" (string t.type_)
-                        in Ok ())
+          fun t ctx ->
+            record ctx "t" 8
+              (fun ctx ->
+                 let* () = field ctx "name" (string t.name)
+                  in
+                 let* () = field ctx "commisioned" (bool t.commisioned)
+                  in
+                 let* () = field ctx "updated_at" (int64 t.updated_at)
+                  in
+                 let* () = field ctx "credits" ((s (option int32)) t.credits)
+                  in
+                 let* () = field ctx "keywords" ((s (array string)) t.keywords)
+                  in
+                 let* () = field ctx "rank" ((s serialize_rank) t.rank)
+                  in
+                 let* () = field ctx "value" (float t.value)
+                  in let* () = field ctx "type" (string t.type_)
+                      in Ok ())
       let _ = serialize_t
       open! Serde
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let deserialize_t =
-        let ( let* ) = Result.bind in
+        let ( let* ) = Stdlib.Result.bind in
         let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
@@ -281,18 +275,18 @@
                  let* () = read_fields ()
                   in
                  let* name =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg "missing field \"name\" (\"name\")") (
                      !name)
                   in
                  let* commisioned =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg
                               "missing field \"commisioned\" (\"commisioned\")")
                      (!commisioned)
                   in
                  let* updated_at =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg
                               "missing field \"updated_at\" (\"updated_at\")")
                      (!updated_at)
@@ -300,22 +294,22 @@
                  let credits =
                    match !credits with | Some opt -> opt | None -> None in
                  let* keywords =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg "missing field \"keywords\" (\"keywords\")")
                      (!keywords)
                   in
                  let* rank =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg "missing field \"rank\" (\"rank\")") (
                      !rank)
                   in
                  let* value =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg "missing field \"value\" (\"value\")")
                      (!value)
                   in
                  let* type_ =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg "missing field \"type\" (\"type_\")") (
                      !type_)
                   in
@@ -337,23 +331,20 @@
   include
     struct
       let _ = fun (_ : t_list) -> ()
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let serialize_t_list =
+        let ( let* ) = Stdlib.Result.bind in
+        let _ = ( let* ) in
         let open Serde.Ser in
-          fun t ->
-            fun ctx ->
-              record ctx "t_list" 1
-                (fun ctx ->
-                   let* () =
-                     field ctx "stuff" ((s (list (s serialize_t))) t.stuff)
-                    in Ok ())
+          fun t ctx ->
+            record ctx "t_list" 1
+              (fun ctx ->
+                 let* () =
+                   field ctx "stuff" ((s (list (s serialize_t))) t.stuff)
+                  in Ok ())
       let _ = serialize_t_list
       open! Serde
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let deserialize_t_list =
-        let ( let* ) = Result.bind in
+        let ( let* ) = Stdlib.Result.bind in
         let _ = ( let* ) in
         let open Serde.De in
           fun ctx ->
@@ -382,7 +373,7 @@
                  let* () = read_fields ()
                   in
                  let* stuff =
-                   Option.to_result
+                   Stdlib.Option.to_result
                      ~none:(`Msg "missing field \"stuff\" (\"stuff\")")
                      (!stuff)
                   in Ok { stuff })
