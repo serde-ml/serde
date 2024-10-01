@@ -35,7 +35,8 @@
     {
       tool_name = "ppx_driver";
       include_dirs = [];
-      load_path = [];
+      hidden_include_dirs = [];
+      load_path = ([], []);
       open_modules = [];
       for_package = None;
       debug = false;
@@ -52,16 +53,14 @@
   include
     struct
       let _ = fun (_ : numbers) -> ()
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let serialize_numbers =
-        let open Serde.Ser in fun t -> fun ctx -> (s (list int)) t ctx
+        let ( let* ) = Stdlib.Result.bind in
+        let _ = ( let* ) in
+        let open Serde.Ser in fun t ctx -> (s (list int)) t ctx
       let _ = serialize_numbers
       open! Serde
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let deserialize_numbers =
-        let ( let* ) = Result.bind in
+        let ( let* ) = Stdlib.Result.bind in
         let _ = ( let* ) in let open Serde.De in fun ctx -> (d (list int)) ctx
       let _ = deserialize_numbers
     end[@@ocaml.doc "@inline"][@@merlin.hide ]
@@ -69,17 +68,15 @@
   include
     struct
       let _ = fun (_ : number_list_list) -> ()
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let serialize_number_list_list =
+        let ( let* ) = Stdlib.Result.bind in
+        let _ = ( let* ) in
         let open Serde.Ser in
-          fun t -> fun ctx -> (s (array (s serialize_numbers))) t ctx
+          fun t ctx -> (s (array (s serialize_numbers))) t ctx
       let _ = serialize_number_list_list
       open! Serde
-      let ( let* ) = Result.bind
-      let _ = ( let* )
       let deserialize_number_list_list =
-        let ( let* ) = Result.bind in
+        let ( let* ) = Stdlib.Result.bind in
         let _ = ( let* ) in
         let open Serde.De in fun ctx -> (d (array (d deserialize_numbers))) ctx
       let _ = deserialize_number_list_list

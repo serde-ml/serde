@@ -1,5 +1,3 @@
-[@@@warning "-37"]
-
 type rank =
   | Captain of { name : string; ship : string }
   | Commander of string * int32 * float

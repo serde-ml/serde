@@ -1,11 +1,9 @@
-[@@@warning "-37"]
-
 type rank =
   | Captain of { name : string; ship : string }
   | Commander of string * int32 * float
   | Lt of bool option
   | Ensign
-[@@deriving serialize, deserialize] [@@serde {tag = "t"; content = "c"}]
+[@@deriving serialize, deserialize] [@@serde { tag = "t"; content = "c" }]
 
 type ranks = Ranks of rank list [@@deriving serialize, deserialize]
 
