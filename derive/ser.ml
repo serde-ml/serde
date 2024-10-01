@@ -371,7 +371,6 @@ let gen_serialize_impl ~ctxt type_decl =
       Serde.Ser.(fun t ctx -> [%e body])]
 
 let generate_impl ~ctxt (_rec_flag, type_declarations) =
-  let loc = loc ~ctxt in
   List.map (gen_serialize_impl ~ctxt) type_declarations
 
 let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
