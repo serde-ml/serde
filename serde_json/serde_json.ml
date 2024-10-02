@@ -232,6 +232,7 @@ module Deserializer = struct
     Ok v
 
   let deserialize_element self s de =
+    Parser.skip_space s.reader;
     match Parser.peek s.reader with
     | Some ']' -> Ok None
     | _ ->

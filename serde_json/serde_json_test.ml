@@ -510,6 +510,36 @@ let _serde_json_parse_test_no_key =
         (error "Failed!");
       assert false
 
+type list_of_record = { records : hello list } [@@deriving deserialize]
+
+let _serde_json_parse_test_list_of_records =
+  let str = {| { "records": [ { "hello": "just one element" } ] } |} in
+  let parsed = Serde_json.of_string deserialize_list_of_record str in
+  match parsed with
+  | Ok parsed ->
+      let _ = (List.hd parsed.records).hello in
+      Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with no key"
+        (keyword "OK")
+  | Error _ ->
+      Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with no key"
+        (error "Failed!");
+      assert false
+
+let _serde_json_parse_test_list_of_records_with_space =
+  let str =
+    {| { "records": [ { "hello": "two elements: one" } , { "hello": "two elements: two" }] } |}
+  in
+  let parsed = Serde_json.of_string deserialize_list_of_record str in
+  match parsed with
+  | Ok parsed ->
+      let _ = (List.hd parsed.records).hello in
+      Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with no key"
+        (keyword "OK")
+  | Error _ ->
+      Format.printf "serde_json.ser/de test %S %s\r\n%!" "parsed with no key"
+        (error "Failed!");
+      assert false
+
 type with_default = {
   greeting : string;
   count_with_default : int; [@serde { default = 5 }]
